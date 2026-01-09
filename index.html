@@ -59,7 +59,7 @@
 <body>
     <div class="viewport" id="viewport">
         <div class="save-indicator"> <div class="dot saved" id="statusDot"></div> <span id="statusText">已保存</span> </div>
-        <div class="status-bar">双指: 缩放/旋转/轻点撤销 | 三指: 轻点重做</div>
+        <div class="status-bar">双指: 移动/缩放/旋转/轻点撤销 | 三指: 轻点重做</div>
         <canvas id="mainCanvas"></canvas>
     </div>
     <div class="sidebar">
@@ -158,7 +158,7 @@
         currentTool: 'brush', currentBrushPath: [], pathsToErase: new Set(),
         drag: { isActive: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 },
         draggedLayerId: null,
-        gesture: { type: null, startDist: 0, startAngle: 0, startZoom: 1, startViewRotation: 0, lastTapTime: 0, startPoints: [] },
+        gesture: { type: null, startDist: 0, startAngle: 0, startZoom: 1, startViewRotation: 0, lastTapTime: 0, startPoints: [], startPan: {x: 0, y: 0} },
         dragStartAngle: 0, dragStartViewRot: 0, cursorWorldX: 0, cursorWorldY: 0, cursorScreenX: 0, cursorScreenY: 0, isCursorInCanvas: false,
         onionEnabled: true, onionOpacity: 0.5, snapToMidline: true, hasUnsavedChanges: false, dpr: 1, fps: 12
     };
@@ -191,11 +191,9 @@
         ctx.fillStyle = state.backgroundColor; ctx.fill();
         ctx.clip();
         
-        if (state.onionEnabled && !state.isPlaying && getActiveLayer()) renderOnionSkins(ctx);
-        
         state.layers.forEach(layer => { if (layer.visible) renderLayer(ctx, layer); });
-        
         if (state.isDrawing && state.currentBrushPath.length > 0) renderLayer(ctx, { ...getActiveLayer(), paths: [new Path(state.currentBrushPath)] });
+        if (state.onionEnabled && !state.isPlaying && getActiveLayer()) renderOnionSkins(ctx);
         ctx.restore();
         
         if (!state.isPlaying) {
@@ -218,7 +216,7 @@
                     ctx.moveTo(state.cursorScreenX, state.cursorScreenY - crosshairSize);
                     ctx.lineTo(state.cursorScreenX, state.cursorScreenY + crosshairSize);
                     ctx.stroke();
-                } else { // Stroke mode brush
+                } else {
                     const cursorRadius = (activeLayer.strokeWidth / 2) * state.zoom;
                     ctx.beginPath();
                     ctx.arc(state.cursorScreenX, state.cursorScreenY, cursorRadius, 0, 2 * Math.PI);
@@ -342,6 +340,7 @@
     }
 
     function bindEvents() {
+        // Pointer/Mouse Events
         DOM.viewport.addEventListener('pointerdown', e => {
             if (e.pointerType === 'touch' && e.isPrimary && state.gesture.type) return;
             if (!e.isPrimary) return;
@@ -358,8 +357,9 @@
         });
         DOM.viewport.addEventListener('pointermove', e => {
             if (!e.isPrimary) return;
-            state.cursorScreenX = e.clientX - DOM.viewport.getBoundingClientRect().left;
-            state.cursorScreenY = e.clientY - DOM.viewport.getBoundingClientRect().top;
+            const rect = DOM.viewport.getBoundingClientRect();
+            state.cursorScreenX = e.clientX - rect.left;
+            state.cursorScreenY = e.clientY - rect.top;
             if (state.gesture.type) return;
 
             const worldPos = getScreenToWorldPos(e.clientX, e.clientY);
@@ -499,22 +499,39 @@
         state.gesture.startPoints = Array.from(e.touches).map(t => ({x: t.clientX, y: t.clientY}));
         state.gesture.lastTapTime = Date.now();
         if (e.touches.length === 2) {
-            state.gesture.type = 'pinch-rotate';
+            state.gesture.type = 'transform';
             state.gesture.startDist = getTouchDistance(e.touches);
             state.gesture.startAngle = getTouchAngle(e.touches);
             state.gesture.startZoom = state.zoom;
             state.gesture.startViewRotation = state.viewRotation;
+            state.gesture.startPan = { x: state.panX, y: state.panY };
         }
     }
     function handleTouchMove(e) {
-        if (state.gesture.type === 'pinch-rotate' && e.touches.length === 2) {
+        if (state.gesture.type === 'transform' && e.touches.length === 2) {
             e.preventDefault();
-            const newDist = getTouchDistance(e.touches);
-            const newAngle = getTouchAngle(e.touches);
-            const scale = newDist / state.gesture.startDist;
-            state.zoom = Math.max(0.1, Math.min(state.gesture.startZoom * scale, 10));
+
+            // Calculate current finger positions
+            const t1 = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+            const t2 = {x: e.touches[1].clientX, y: e.touches[1].clientY};
+
+            // --- Rotation ---
+            const newAngle = Math.atan2(t1.y - t2.y, t1.x - t2.x) * 180 / Math.PI;
             const angleDiff = newAngle - state.gesture.startAngle;
             state.viewRotation = state.gesture.startViewRotation + angleDiff;
+
+            // --- Panning & Zooming ---
+            const newDist = Math.hypot(t1.x - t2.x, t1.y - t2.y);
+            const scale = newDist / state.gesture.startDist;
+            const newZoom = Math.max(0.1, Math.min(state.gesture.startZoom * scale, 20));
+
+            const screenMidpoint = { x: (t1.x + t2.x) / 2, y: (t1.y + t2.y) / 2 };
+            const worldMidpoint = getScreenToWorldPos(screenMidpoint.x, screenMidpoint.y, state.gesture.startZoom, state.gesture.startPan.x, state.gesture.startPan.y, state.viewRotation);
+            
+            state.zoom = newZoom;
+            state.panX = screenMidpoint.x - (worldMidpoint.x * state.zoom);
+            state.panY = screenMidpoint.y - (worldMidpoint.y * state.zoom);
+
             render();
         }
     }
@@ -540,21 +557,19 @@
     function getTouchAngle(touches) { return Math.atan2(touches[0].clientY - touches[1].clientY, touches[0].clientX - touches[1].clientX) * 180 / Math.PI; }
     function resetGestureState() { state.gesture.type = null; state.gesture.startPoints = []; }
 
-    function getScreenToWorldPos(screenX, screenY) {
+    function getScreenToWorldPos(screenX, screenY, zoom = state.zoom, panX = state.panX, panY = state.panY, viewRotation = state.viewRotation) {
         const rect = DOM.viewport.getBoundingClientRect();
-        const viewX = screenX - rect.left;
-        const viewY = screenY - rect.top;
-        const worldX = (viewX - state.panX) / state.zoom;
-        const worldY = (viewY - state.panY) / state.zoom;
+        const viewX = screenX - rect.left, viewY = screenY - rect.top;
+        const worldX = (viewX - panX) / zoom, worldY = (viewY - panY) / zoom;
         const cx = CONFIG.baseSize / 2, cy = CONFIG.baseSize / 2;
         const dx = worldX - cx, dy = worldY - cy;
         const dynamicRotation = state.isPlaying ? state.animRotation : 0;
-        const rad = -(state.viewRotation + dynamicRotation) * Math.PI / 180;
+        const rad = -(viewRotation + dynamicRotation) * Math.PI / 180;
         const finalX = dx * Math.cos(rad) - dy * Math.sin(rad) + cx;
         const finalY = dx * Math.sin(rad) + dy * Math.cos(rad) + cy;
         return { x: finalX, y: finalY };
     }
-
+    
     function getMouseAngle(clientX, clientY) { const rect = DOM.mainCanvas.getBoundingClientRect(); const z = state.zoom || 1; const screenCx = rect.left + state.panX + (CONFIG.baseSize/2 * z); const screenCy = rect.top + state.panY + (CONFIG.baseSize/2 * z); return Math.atan2(clientY - screenCy, clientX - screenCx) * 180 / Math.PI; }
     function resizeCanvas() { DOM.mainCanvas.width = DOM.viewport.clientWidth * state.dpr; DOM.mainCanvas.height = DOM.viewport.clientHeight * state.dpr; render(); }
     function loop(time) {
