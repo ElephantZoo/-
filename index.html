@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>费纳奇镜 v9.9 纯桌面版（修复快捷键+单一面板）</title>
+    <title>费纳奇镜 v12.0 (稳定版)</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
     <style>
         :root {
             --bg-color: #181818; --panel-color: #252525; --item-color: #333;
@@ -29,18 +32,20 @@
         .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
         .btn-group { display: flex; width: 100%; gap: 1px; background: #222; border-radius: 4px; overflow: hidden; }
         .btn-group-full { display:flex; flex-wrap: wrap; gap:5px; margin-top:8px;}
-        button, .btn-label { background-color: #444; color: #ddd; border: none; padding: 6px 10px; cursor: pointer; flex: 1; font-size: 12px; transition: 0.1s; text-align: center; display: inline-block; line-height: normal; }
+        button, .btn-label { background-color: #444; color: #ddd; border: none; padding: 6px 10px; cursor: pointer; flex: 1; font-size: 12px; transition: 0.1s; text-align: center; display: inline-block; line-height: normal; border-radius: 3px; }
         button:hover, .btn-label:hover { background-color: #555; }
         button:disabled { background-color: #333; color: #777; cursor: not-allowed; }
-        button.active { background-color: var(--accent-color); color: #000; font-weight: bold; }
+        button.active, .btn-label.active { background-color: var(--accent-color); color: #000; font-weight: bold; }
         button.small-btn { padding: 4px 8px; flex: 0 0 auto; }
         button.dir-btn.active { background: var(--danger-color); color:#fff; }
         .btn-label.json-btn { background: #9b59b6; color:#fff; } .btn-label.json-btn:hover { background: #8e44ad; }
         button.json-btn { background: #9b59b6; color:#fff; } button.json-btn:hover { background: #8e44ad; }
         button.reset-btn { background: #e74c3c; color:#fff; } button.reset-btn:hover { background: #c0392b; }
-        input[type="range"] { flex: 1; height: 4px; accent-color: var(--accent-color); background: #555; border-radius: 2px; }
+        input[type="range"] { flex: 1; height: 4px; accent-color: var(--accent-color); background: #555; border-radius: 2px; -webkit-appearance: none; appearance: none; padding:0; margin:0;}
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent-color); cursor: pointer; }
+        input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--accent-color); cursor: pointer; border:none; }
         input[type="number"] { width: 40px; background: #222; border: 1px solid #444; color: white; border-radius: 3px; padding: 3px; text-align: center; }
-        input[type="file"] { opacity:0; width:0; height:0; position:absolute; }
+        input[type="file"], input[type="checkbox"].visually-hidden { opacity:0; width:0; height:0; position:absolute; }
         .layer-list { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; background: #222; border-radius: 4px; padding: 4px; }
         .layer-item { display: flex; align-items: center; gap: 8px; padding: 6px; background: #333; color: #aaa; cursor: grab; border: 1px solid transparent; border-radius: 3px; transition: background-color 0.1s; }
         .layer-item.active { background: #444; color: #fff; border-color: var(--accent-color); }
@@ -53,7 +58,6 @@
         input[type="color"] { -webkit-appearance: none; -moz-appearance: none; appearance: none; width: 32px; height: 32px; background-color: transparent; border: none; cursor: pointer; position: relative; top: -4px; left: -4px; }
         input[type="color"]::-webkit-color-swatch { border-radius: 4px; border: 2px solid #555; }
         input[type="color"]::-moz-color-swatch { border-radius: 4px; border: 2px solid #555; }
-        /* 底部完整快捷键面板样式 - 仅保留这一个 */
         .shortcut-panel { position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.9); padding: 8px 15px; border-radius: 6px; font-size: 12px; color: #ccc; pointer-events: none; border: 1px solid #555; z-index: 99; display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; }
         .shortcut-panel span { display: inline-block; }
         .shortcut-panel strong { color: var(--accent-color); font-weight: normal; padding: 0 2px; }
@@ -63,18 +67,21 @@
     <div class="viewport" id="viewport">
         <div class="save-indicator"> <div class="dot saved" id="statusDot"></div> <span id="statusText">已保存</span> </div>
         <canvas id="mainCanvas"></canvas>
-        <!-- 仅保留一个完整快捷键面板，删除了原有的status-bar -->
         <div class="shortcut-panel">
-            <span><strong>空格</strong> 持续拖拽 | <strong>R</strong> 旋转模式 | <strong>B</strong> 画笔 | <strong>E</strong> 橡皮擦</span>
-            <span><strong>滚轮</strong> 缩放画布 | <strong>Shift+滚轮</strong> 旋转画布</span>
-            <span><strong>← →</strong> 微调旋转角度 | <strong>[ ]</strong> 增减画笔粗细</span>
-            <span><strong>Ctrl+Z</strong> 撤销 | <strong>Ctrl+Shift+Z / Ctrl+Y</strong> 重做 | <strong>Ctrl+0</strong> 复位视图</span>
+            <span><strong>空格</strong> 拖拽 | <strong>R</strong> 旋转 | <strong>B</strong> 画笔 | <strong>E</strong> 橡皮擦</span>
+            <span><strong>滚轮</strong> 缩放 | <strong>Shift+滚轮</strong> 旋转</span>
+            <span><strong>← →</strong> 微调旋转 | <strong>[ ]</strong> 画笔粗细</span>
+            <span><strong>Ctrl+Z</strong> 撤销 | <strong>Ctrl+Y</strong> 重做 | <strong>Ctrl+0</strong> 复位视图</span>
         </div>
     </div>
     <div class="sidebar">
         <div class="scroll-area">
             <div class="panel-section">
                 <div class="section-header">全局控制</div>
+                <div class="row" style="margin-bottom:8px;">
+                    <span style="font-size:12px; flex-shrink: 0;">项目名称:</span>
+                    <input type="text" id="projectNameInput" class="current-layer-input" style="flex-grow:1;" placeholder="为你的项目命名">
+                </div>
                 <div class="btn-group" style="margin-bottom:8px;"> <button id="undoBtn">↩ 撤销</button> <button id="redoBtn">↪ 重做</button> </div>
                 <div class="btn-group" style="margin-bottom:8px;">
                     <button id="playbackModeBtn">逐格模式</button> <button id="playBtn">▶ 播放</button>
@@ -91,6 +98,7 @@
                     <div>
                         <button class="small-btn" id="addLayerBtn" title="新建图层">+</button>
                         <button class="small-btn" id="delLayerBtn" title="删除图层">-</button>
+                        <button class="small-btn" id="copyLayerBtn" title="复制图层">⧉</button>
                         <button class="small-btn" id="clearLayerBtn" title="清空图层">🗑️</button>
                     </div>
                 </div>
@@ -131,23 +139,31 @@
             </div>
             <div class="panel-section">
                 <div class="section-header">辅助与完整导出</div>
-                <div class="row"> <span style="font-size:12px">洋葱皮</span> <input type="checkbox" id="onionToggle" checked> </div>
+                <div class="row" style="align-items: center;">
+                    <label for="onionToggle" style="font-size:12px; cursor:pointer; flex-shrink: 0;">洋葱皮</label>
+                    <input type="checkbox" id="onionToggle" checked>
+                    <div style="display: flex; gap: 5px; margin-left: auto;">
+                        <label for="onionBeforeToggle" class="btn-label small-btn" style="padding: 2px 6px; flex:none;">前一帧</label>
+                        <input type="checkbox" id="onionBeforeToggle" class="visually-hidden" checked>
+                        <label for="onionAfterToggle" class="btn-label small-btn" style="padding: 2px 6px; flex:none;">后一帧</label>
+                        <input type="checkbox" id="onionAfterToggle" class="visually-hidden" checked>
+                    </div>
+                </div>
                 <div class="row">
                     <span style="font-size:12px; flex-shrink: 0;">洋葱皮透明度:</span>
                     <input type="range" id="onionOpacity" min="0" max="1" step="0.05" value="0.5">
                     <span id="onionOpacityVal" style="font-size:11px; width:28px;">0.5</span>
                 </div>
-                <!-- 洋葱皮层级切换按钮 -->
                 <div class="row">
                     <button id="onionLayerBtn" class="small-btn" title="切换洋葱皮显示在画面最上层/最下层">洋葱皮 ▲ 置顶</button>
                 </div>
                 <div class="row"> <span style="font-size:12px">扇形数</span> <input type="number" id="sliceCount" value="12" min="4" max="24"> </div>
                 <div class="btn-group-full">
-                    <button id="exportJsonBtn" class="json-btn">导出项目(JSON)</button>
+                    <button id="exportJsonBtn" class="json-btn">导出项目(ZIP)</button>
                 </div>
                 <div class="btn-group-full">
-                    <label for="importJsonInput" class="btn-label json-btn" style="flex-grow: 2;">导入项目 (JSON)</label>
-                    <input type="file" id="importJsonInput" accept=".json"> <button id="resetAllBtn" class="reset-btn">重置所有</button>
+                    <label for="importJsonInput" class="btn-label json-btn" style="flex-grow: 2;">导入项目 (JSON/ZIP)</label>
+                    <input type="file" id="importJsonInput" accept=".json,.zip"> <button id="resetAllBtn" class="reset-btn">重置所有</button>
                 </div>
             </div>
         </div>
@@ -166,13 +182,15 @@
     }
 
     const state = {
+        projectName: '未命名项目',
         layers: [], activeLayerIndex: -1, isPlaying: false, sliceCount: 12, animRotation: 0, rotDirection: 1, playbackMode: 'slice',
         backgroundColor: '#ffffff', zoom: 1, panX: 0, panY: 0, viewRotation: 0, isDrawing: false, isPanning: false, isRotating: false, isErasing: false,
         currentTool: 'brush', currentBrushPath: [], pathsToErase: new Set(),
         drag: { isActive: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 },
         draggedLayerId: null,
         dragStartAngle: 0, dragStartViewRot: 0, cursorWorldX: 0, cursorWorldY: 0, cursorScreenX: 0, cursorScreenY: 0, isCursorInCanvas: false,
-        onionEnabled: true, onionOpacity: 0.5, onionOnTop: true, // 洋葱皮层级状态：true=置顶，false=置底
+        onionSkins: { enabled: true, showBefore: true, showAfter: true, opacity: 0.5 },
+        onionOnTop: true,
         snapToMidline: true, hasUnsavedChanges: false, dpr: 1, fps: 12
     };
 
@@ -180,7 +198,7 @@
     let undoStack = [], redoStack = [];
 
     function init() {
-        const ids = [ "viewport", "mainCanvas", "importJsonInput", "onionToggle", "onionOpacity", "onionOpacityVal", "fpsRange", "fpsVal", "rotationSlider", "currentLayerInput", "layerList", "brushSizeLabel", "brushSize", "brushSizeVal", "statusDot", "statusText", "playBtn", "playbackModeBtn", "sliceCount", "snapToggle", "layerColorInput", "layerOpacity", "layerOpacityVal", "modeFillBtn", "modeStrokeBtn", "toolEraserBtn", "undoBtn", "redoBtn", "addLayerBtn", "delLayerBtn", "clearLayerBtn", "resetViewBtn", "exportJsonBtn", "resetAllBtn", "rotateDirBtn", "backgroundColorInput", "onionLayerBtn" ];
+        const ids = [ "viewport", "mainCanvas", "importJsonInput", "onionToggle", "onionOpacity", "onionOpacityVal", "fpsRange", "fpsVal", "rotationSlider", "currentLayerInput", "layerList", "brushSizeLabel", "brushSize", "brushSizeVal", "statusDot", "statusText", "playBtn", "playbackModeBtn", "sliceCount", "snapToggle", "layerColorInput", "layerOpacity", "layerOpacityVal", "modeFillBtn", "modeStrokeBtn", "toolEraserBtn", "undoBtn", "redoBtn", "addLayerBtn", "delLayerBtn", "clearLayerBtn", "resetViewBtn", "exportJsonBtn", "resetAllBtn", "rotateDirBtn", "backgroundColorInput", "onionLayerBtn", "projectNameInput", "copyLayerBtn", "onionBeforeToggle", "onionAfterToggle" ];
         ids.forEach(id => DOM[id] = document.getElementById(id));
         DOM.ctx = DOM.mainCanvas.getContext('2d');
         state.dpr = window.devicePixelRatio || 1;
@@ -204,9 +222,8 @@
         ctx.fillStyle = state.backgroundColor; ctx.fill();
         ctx.clip();
         
-        // 洋葱皮层级控制：置底时先画洋葱皮，置顶时后画洋葱皮
         const activeLayer = getActiveLayer();
-        if (state.onionEnabled && !state.isPlaying && activeLayer && !state.onionOnTop) {
+        if (state.onionSkins.enabled && !state.isPlaying && activeLayer && !state.onionOnTop) {
             renderOnionSkins(ctx);
         }
         
@@ -214,7 +231,7 @@
         
         if (state.isDrawing && state.currentBrushPath.length > 0) renderLayer(ctx, { ...getActiveLayer(), paths: [new Path(state.currentBrushPath)] });
         
-        if (state.onionEnabled && !state.isPlaying && activeLayer && state.onionOnTop) {
+        if (state.onionSkins.enabled && !state.isPlaying && activeLayer && state.onionOnTop) {
             renderOnionSkins(ctx);
         }
         ctx.restore();
@@ -253,17 +270,36 @@
     
     function setupTransform(ctx) { ctx.translate(state.panX, state.panY); ctx.scale(state.zoom, state.zoom); const cx = CONFIG.baseSize / 2, cy = CONFIG.baseSize / 2; ctx.translate(cx, cy); ctx.rotate(state.viewRotation * Math.PI / 180); if (state.isPlaying) ctx.rotate(state.animRotation * Math.PI / 180); ctx.translate(-cx, -cy); }
     
-    function renderLayer(ctx, layer) { ctx.save(); ctx.globalAlpha = layer.opacity; ctx.strokeStyle = layer.color; ctx.fillStyle = layer.color; ctx.lineWidth = layer.strokeWidth; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; layer.paths.forEach(path => { if (state.isErasing && state.pathsToErase.has(path.id)) return; if (path.points.length < 1) return; ctx.beginPath(); ctx.moveTo(path.points[0].x, path.points[0].y); for (let i = 1; i < path.points.length; i++) ctx.lineTo(path.points[i].x, path.points[i].y); if (layer.mode === 'fill') { if (path.points.length > 1) ctx.closePath(); ctx.fill(); } else { ctx.stroke(); } }); ctx.restore(); }
+    function renderLayer(ctx, layer) {
+        ctx.save();
+        ctx.globalAlpha = layer.opacity;
+        ctx.strokeStyle = layer.color;
+        ctx.fillStyle = layer.color;
+        ctx.lineWidth = layer.strokeWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        layer.paths.forEach(path => {
+            if (state.isErasing && state.pathsToErase.has(path.id)) return;
+            if (path.points.length < 1) return;
+            ctx.beginPath();
+            ctx.moveTo(path.points[0].x, path.points[0].y);
+            for (let i = 1; i < path.points.length; i++) ctx.lineTo(path.points[i].x, path.points[i].y);
+            if (layer.mode === 'fill') { if (path.points.length > 1) ctx.closePath(); ctx.fill(); } else { ctx.stroke(); }
+        });
+        ctx.restore();
+    }
 
     function renderOnionSkins(ctx) {
         const activeLayer = getActiveLayer(); if (!activeLayer || activeLayer.paths.length === 0) return;
-        const tempCanvas = document.createElement('canvas'); tempCanvas.width = CONFIG.baseSize; tempCanvas.height = CONFIG.baseSize;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = CONFIG.baseSize; tempCanvas.height = CONFIG.baseSize;
         const tempCtx = tempCanvas.getContext('2d');
         renderLayer(tempCtx, { ...activeLayer, opacity: 1 });
 
         const step = 360 / state.sliceCount * Math.PI / 180;
         const drawTintedFrame = (rotation, color) => {
-            const tintedCanvas = document.createElement('canvas'); tintedCanvas.width = CONFIG.baseSize; tintedCanvas.height = CONFIG.baseSize;
+            const tintedCanvas = document.createElement('canvas');
+            tintedCanvas.width = CONFIG.baseSize; tintedCanvas.height = CONFIG.baseSize;
             const tintedCtx = tintedCanvas.getContext('2d');
             tintedCtx.drawImage(tempCanvas, 0, 0);
             tintedCtx.globalCompositeOperation = 'source-in';
@@ -271,16 +307,19 @@
             tintedCtx.fillRect(0, 0, CONFIG.baseSize, CONFIG.baseSize);
 
             ctx.save();
-            ctx.globalAlpha = state.onionOpacity;
-            ctx.translate(CONFIG.baseSize/2, CONFIG.baseSize/2); ctx.rotate(rotation); ctx.translate(-CONFIG.baseSize/2, -CONFIG.baseSize/2);
+            ctx.globalAlpha = state.onionSkins.opacity;
+            ctx.translate(CONFIG.baseSize/2, CONFIG.baseSize/2);
+            ctx.rotate(rotation);
+            ctx.translate(-CONFIG.baseSize/2, -CONFIG.baseSize/2);
             ctx.drawImage(tintedCanvas, 0, 0);
             ctx.restore();
         };
-        drawTintedFrame(-step * state.rotDirection, 'rgba(255, 0, 0, 0.7)');
-        drawTintedFrame(step * state.rotDirection, 'rgba(0, 0, 255, 0.7)');
+        if (state.onionSkins.showBefore) drawTintedFrame(-step * state.rotDirection, 'rgba(255, 0, 0, 0.7)');
+        if (state.onionSkins.showAfter) drawTintedFrame(step * state.rotDirection, 'rgba(0, 0, 255, 0.7)');
     }
 
     function updateUI() {
+        DOM.projectNameInput.value = state.projectName;
         const activeLayer = getActiveLayer(); const hasLayers = activeLayer !== null;
         DOM.currentLayerInput.disabled = !hasLayers; DOM.layerColorInput.disabled = !hasLayers;
         DOM.modeFillBtn.disabled = !hasLayers; DOM.modeStrokeBtn.disabled = !hasLayers;
@@ -291,16 +330,20 @@
             DOM.modeFillBtn.classList.toggle('active', state.currentTool === 'brush' && activeLayer.mode === 'fill');
             DOM.modeStrokeBtn.classList.toggle('active', state.currentTool === 'brush' && activeLayer.mode === 'stroke');
             DOM.toolEraserBtn.classList.toggle('active', state.currentTool === 'eraser');
-            DOM.brushSizeLabel.textContent = "粗细:";
             DOM.brushSize.value = activeLayer.strokeWidth; DOM.brushSizeVal.textContent = activeLayer.strokeWidth;
             DOM.layerOpacity.value = activeLayer.opacity; DOM.layerOpacityVal.textContent = activeLayer.opacity.toFixed(2);
         } else { DOM.currentLayerInput.value = "无图层"; }
         DOM.undoBtn.disabled = undoStack.length <= 1; DOM.redoBtn.disabled = redoStack.length === 0;
-        DOM.onionOpacityVal.textContent = state.onionOpacity.toFixed(2); DOM.onionOpacity.value = state.onionOpacity;
         DOM.backgroundColorInput.value = state.backgroundColor;
-        // 更新洋葱皮层级按钮文本和样式
         DOM.onionLayerBtn.textContent = state.onionOnTop ? '洋葱皮 ▲ 置顶' : '洋葱皮 ▼ 置底';
         DOM.onionLayerBtn.classList.toggle('active', state.onionOnTop);
+        DOM.onionToggle.checked = state.onionSkins.enabled;
+        DOM.onionBeforeToggle.checked = state.onionSkins.showBefore;
+        DOM.onionAfterToggle.checked = state.onionSkins.showAfter;
+        document.querySelector('label[for="onionBeforeToggle"]').classList.toggle('active', state.onionSkins.showBefore && state.onionSkins.enabled);
+        document.querySelector('label[for="onionAfterToggle"]').classList.toggle('active', state.onionSkins.showAfter && state.onionSkins.enabled);
+        DOM.onionOpacityVal.textContent = state.onionSkins.opacity.toFixed(2);
+        DOM.onionOpacity.value = state.onionSkins.opacity;
         renderLayerList();
     }
     
@@ -332,211 +375,72 @@
     function addLayer(name, color) { const newLayer = new Layer(Date.now(), name || `图层 ${state.layers.length + 1}`, color); state.layers.push(newLayer); setActiveLayer(state.layers.length - 1); saveHistory(); }
     function deleteLayer() { if (state.layers.length <= 1) return; state.layers.splice(state.activeLayerIndex, 1); setActiveLayer(Math.max(0, state.activeLayerIndex - 1)); saveHistory(); }
     function clearLayer() { const layer = getActiveLayer(); if(layer && confirm(`确定要清空图层 "${layer.name}" 吗?`)) { layer.paths = []; saveHistory(); render(); } }
+    function duplicateLayer() {
+        const activeLayer = getActiveLayer(); if (!activeLayer) return;
+        const newLayer = JSON.parse(JSON.stringify(activeLayer));
+        newLayer.id = Date.now();
+        newLayer.name = `${activeLayer.name} (副本)`;
+        state.layers.splice(state.activeLayerIndex + 1, 0, newLayer);
+        setActiveLayer(state.activeLayerIndex + 1);
+        saveHistory();
+    }
     function setActiveLayer(index) { state.activeLayerIndex = index; updateUI(); render(); }
     function toggleLayerVisibility(layerId) { const layer = state.layers.find(l => l.id === layerId); if(layer) { layer.visible = !layer.visible; saveHistory(); updateUI(); render(); } }
     function changeActiveLayerProperty(prop, value) { const layer = getActiveLayer(); if (layer && layer[prop] !== value) { layer[prop] = value; saveHistory(); updateUI(); render(); } }
-    function simplifyPath(points, threshold) { 
-    if (points.length < 3) return points; 
-    const newPoints = [points[0]]; 
-    let lastPoint = points[0]; 
-    for (let i = 1; i < points.length -1; i++) { 
-        const dist = Math.hypot(points[i].x - lastPoint.x, points[i].y - lastPoint.y); 
-        if (dist > threshold) { 
-            newPoints.push(points[i]); 
-            lastPoint = points[i]; 
-        } 
-    } 
-    newPoints.push(points[points.length - 1]);
-    // 修复：防止单点绘制时被简化为空，强制保留至少2个点
-    if(newPoints.length === 1) newPoints.push(points[1]);
-    return newPoints; 
-    }
+    function simplifyPath(points, threshold) { if (points.length < 3) return points; const newPoints = [points[0]]; let lastPoint = points[0]; for (let i = 1; i < points.length -1; i++) { const dist = Math.hypot(points[i].x - lastPoint.x, points[i].y - lastPoint.y); if (dist > threshold) { newPoints.push(points[i]); lastPoint = points[i]; } } newPoints.push(points[points.length - 1]); if(newPoints.length === 1 && points.length > 1) newPoints.push(points[1]); return newPoints; }
     function findClosestPath(pos) { const layer = getActiveLayer(); if (!layer) return null; let closestPath = null, minDistance = Infinity; for (const path of layer.paths) { if(state.pathsToErase.has(path.id)) continue; for (const point of path.points) { const dist = Math.hypot(pos.x - point.x, pos.y - point.y); if (dist < minDistance) { minDistance = dist; closestPath = path; } } } return (minDistance < (layer.strokeWidth/2 + 5) / state.zoom) ? closestPath : null; }
-    function saveHistory() { const snapshot = JSON.stringify({ layers: state.layers, activeLayerIndex: state.activeLayerIndex }); undoStack.push(snapshot); if (undoStack.length > CONFIG.maxHistory) undoStack.shift(); redoStack = []; updateUI(); }
+    function saveHistory() { const snapshot = JSON.stringify({ layers: state.layers, activeLayerIndex: state.activeLayerIndex }); undoStack.push(snapshot); if (undoStack.length > CONFIG.maxHistory) undoStack.shift(); redoStack = []; if (undoStack.length > 1) { setUnsaved(true); } updateUI(); }
     function loadHistory(snapshot) { const data = JSON.parse(snapshot); state.layers = data.layers; state.activeLayerIndex = data.activeLayerIndex; updateUI(); render(); }
     function undo() { if (undoStack.length <= 1) return; redoStack.push(undoStack.pop()); loadHistory(undoStack[undoStack.length-1]); }
     function redo() { if (redoStack.length === 0) return; const stateToLoad = redoStack.pop(); undoStack.push(stateToLoad); loadHistory(stateToLoad); }
     function setUnsaved(val) { state.hasUnsavedChanges = val; DOM.statusDot.className = `dot ${val ? 'unsaved' : 'saved'}`; DOM.statusText.innerText = val ? '未保存' : '已保存'; }
     function handleDragStart(e) { e.currentTarget.classList.add('dragging'); state.draggedLayerId = parseFloat(e.currentTarget.dataset.layerId); e.dataTransfer.effectAllowed = 'move'; }
     function handleDragOver(e) { e.preventDefault(); const target = e.currentTarget; if (parseFloat(target.dataset.layerId) !== state.draggedLayerId) { target.classList.add('drag-over'); } }
-    function handleDrop(e) {
-        e.preventDefault(); const target = e.currentTarget; target.classList.remove('drag-over');
-        const activeId = getActiveLayer()?.id;
-        const droppedOnId = parseFloat(target.dataset.layerId);
-        const draggedIndex = state.layers.findIndex(l => l.id === state.draggedLayerId);
-        const targetIndex = state.layers.findIndex(l => l.id === droppedOnId);
-        if(draggedIndex === -1 || targetIndex === -1) return;
-        const [draggedLayer] = state.layers.splice(draggedIndex, 1);
-        state.layers.splice(targetIndex, 0, draggedLayer);
-        state.activeLayerIndex = activeId ? state.layers.findIndex(l => l.id === activeId) : 0;
-        saveHistory(); renderLayerList();
-    }
+    function handleDrop(e) { e.preventDefault(); const target = e.currentTarget; target.classList.remove('drag-over'); const activeId = getActiveLayer()?.id; const droppedOnId = parseFloat(target.dataset.layerId); const draggedIndex = state.layers.findIndex(l => l.id === state.draggedLayerId); const targetIndex = state.layers.findIndex(l => l.id === droppedOnId); if(draggedIndex === -1 || targetIndex === -1) return; const [draggedLayer] = state.layers.splice(draggedIndex, 1); state.layers.splice(targetIndex, 0, draggedLayer); state.activeLayerIndex = activeId ? state.layers.findIndex(l => l.id === activeId) : 0; saveHistory(); renderLayerList(); }
     function handleDragEnd(e) { e.currentTarget.classList.remove('dragging'); document.querySelectorAll('.layer-item').forEach(el => el.classList.remove('drag-over')); }
-    
-    function resetInteractionState() {
-        if (!state.isPanning) {
-            state.isRotating = false; state.isDrawing = false; state.isErasing = false;
-            state.drag.isActive = false; state.currentBrushPath = []; state.pathsToErase.clear();
-            DOM.viewport.classList.remove('rotating');
-        }
+    function resetInteractionState() { if (!state.isPanning) { state.isRotating = false; state.isDrawing = false; state.isErasing = false; state.drag.isActive = false; state.currentBrushPath = []; state.pathsToErase.clear(); DOM.viewport.classList.remove('rotating'); } }
+
+    function dataURLtoBlob(dataurl) { const arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr = atob(arr[1]); let n = bstr.length; const u8arr = new Uint8Array(n); while(n--){ u8arr[n] = bstr.charCodeAt(n); } return new Blob([u8arr], {type:mime}); }
+    function triggerDownload(blob, filename) { const a = document.createElement('a'); const url = URL.createObjectURL(blob); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 0); }
+    function loadProjectData(jsonString, filename) {
+        try {
+            const data = JSON.parse(jsonString);
+            if (!data.state) throw new Error("JSON 文件缺少 'state' 字段。");
+            let finalProjectName = '导入的项目';
+            if (filename) finalProjectName = filename.replace(/\.(json|zip)$/i, '');
+            if (data.state.projectName) finalProjectName = data.state.projectName;
+            if (data.state.onionEnabled !== undefined) { data.state.onionSkins = { enabled: data.state.onionEnabled, opacity: data.state.onionOpacity || 0.5, showBefore: true, showAfter: true }; delete data.state.onionEnabled; delete data.state.onionOpacity; }
+            const persistentState = { projectName: finalProjectName, layers: data.state.layers, activeLayerIndex: data.state.activeLayerIndex, sliceCount: data.state.sliceCount, rotDirection: data.state.rotDirection, backgroundColor: data.state.backgroundColor || '#ffffff', zoom: data.state.zoom, panX: data.state.panX, panY: data.state.panY, viewRotation: data.state.viewRotation, onionSkins: data.state.onionSkins, onionOnTop: data.state.onionOnTop || true, snapToMidline: data.state.snapToMidline, fps: data.state.fps, playbackMode: data.state.playbackMode || 'slice' };
+            Object.assign(state, persistentState);
+            resetInteractionState(); setActiveLayer(state.activeLayerIndex);
+            undoStack = []; redoStack = []; saveHistory(); setUnsaved(false);
+            updateUI(); render();
+        } catch (err) { alert('导入失败: 无效的文件格式或内容。\n' + err.message); console.error(err); }
     }
 
     function bindEvents() {
-        DOM.viewport.addEventListener('pointerdown', e => {
-            if (!e.isPrimary) return;
-            DOM.viewport.setPointerCapture(e.pointerId); state.isCursorInCanvas = true;
-            if (e.button === 1 || state.isPanning) { startDrag(e); return; }
-            if (state.isRotating) { state.dragStartAngle = getMouseAngle(e.clientX, e.clientY); state.dragStartViewRot = state.viewRotation; return; }
-            const pos = getScreenToWorldPos(e.clientX, e.clientY);
-            if (state.currentTool === 'eraser') {
-                state.isErasing = true;
-                const pathToErase = findClosestPath(pos); if (pathToErase) state.pathsToErase.add(pathToErase.id);
-            } else if (state.currentTool === 'brush') {
-                state.isDrawing = true; state.currentBrushPath = [pos];
-            }
-        });
-        DOM.viewport.addEventListener('pointermove', e => {
-            if (!e.isPrimary) return;
-            state.cursorScreenX = e.clientX - DOM.viewport.getBoundingClientRect().left;
-            state.cursorScreenY = e.clientY - DOM.viewport.getBoundingClientRect().top;
-
-            const worldPos = getScreenToWorldPos(e.clientX, e.clientY);
-            state.cursorWorldX = worldPos.x; state.cursorWorldY = worldPos.y;
-            
-            if (state.drag.isActive) { doDrag(e); return; }
-            if (state.isRotating && (e.buttons & 1)) { state.viewRotation = state.dragStartViewRot + (getMouseAngle(e.clientX, e.clientY) - state.dragStartAngle); if (state.snapToMidline) snapRotation(); DOM.rotationSlider.value = state.viewRotation; render(); return; }
-            if (state.isDrawing) { 
-            // 播放模式下持续追加坐标，静止绘制也能跟旋转变形，体验优化
-               state.currentBrushPath.push(worldPos); 
-            }
-            if (state.isErasing) { const pathToErase = findClosestPath(worldPos); if (pathToErase) state.pathsToErase.add(pathToErase.id); }
-            render();
-        });
-        DOM.viewport.addEventListener('pointerup', e => {
-            if (!e.isPrimary) return;
-            DOM.viewport.releasePointerCapture(e.pointerId);
-            if (state.isDrawing) {
-                const layer = getActiveLayer();
-                if (layer && state.currentBrushPath.length > 0) { const simplified = simplifyPath(state.currentBrushPath, CONFIG.pathSimplificationThreshold / state.zoom); layer.paths.push(new Path(simplified)); saveHistory(); setUnsaved(true); }
-            }
-            if (state.isErasing) {
-                const layer = getActiveLayer();
-                if (layer && state.pathsToErase.size > 0) { layer.paths = layer.paths.filter(p => !state.pathsToErase.has(p.id)); saveHistory(); setUnsaved(true); }
-            }
-            state.isDrawing = false; state.isErasing = false;
-            state.drag.isActive = false;
-            state.currentBrushPath = []; state.pathsToErase.clear();
-            render();
-        });
-        DOM.viewport.addEventListener('pointerleave', () => { 
-            state.isCursorInCanvas = false; 
-            state.isDrawing = false; state.isErasing = false;
-            state.drag.isActive = false;
-            state.currentBrushPath = []; state.pathsToErase.clear();
-            render(); 
-        });
+        DOM.viewport.addEventListener('pointerdown', e => { if (!e.isPrimary) return; DOM.viewport.setPointerCapture(e.pointerId); state.isCursorInCanvas = true; if (e.button === 1 || state.isPanning) { startDrag(e); return; } if (state.isRotating) { state.dragStartAngle = getMouseAngle(e.clientX, e.clientY); state.dragStartViewRot = state.viewRotation; return; } const pos = getScreenToWorldPos(e.clientX, e.clientY); if (state.currentTool === 'eraser') { state.isErasing = true; const pathToErase = findClosestPath(pos); if (pathToErase) state.pathsToErase.add(pathToErase.id); } else if (state.currentTool === 'brush') { state.isDrawing = true; state.currentBrushPath = [pos]; } });
+        DOM.viewport.addEventListener('pointermove', e => { if (!e.isPrimary) return; state.cursorScreenX = e.clientX - DOM.viewport.getBoundingClientRect().left; state.cursorScreenY = e.clientY - DOM.viewport.getBoundingClientRect().top; const worldPos = getScreenToWorldPos(e.clientX, e.clientY); state.cursorWorldX = worldPos.x; state.cursorWorldY = worldPos.y; if (state.drag.isActive) { doDrag(e); return; } if (state.isRotating && (e.buttons & 1)) { state.viewRotation = state.dragStartViewRot + (getMouseAngle(e.clientX, e.clientY) - state.dragStartAngle); if (state.snapToMidline) snapRotation(); DOM.rotationSlider.value = state.viewRotation; render(); return; } if (state.isDrawing) { state.currentBrushPath.push(worldPos); } if (state.isErasing) { const pathToErase = findClosestPath(worldPos); if (pathToErase) state.pathsToErase.add(pathToErase.id); } render(); });
+        DOM.viewport.addEventListener('pointerup', e => { if (!e.isPrimary) return; DOM.viewport.releasePointerCapture(e.pointerId); if (state.isDrawing) { const layer = getActiveLayer(); if (layer && state.currentBrushPath.length > 0) { const simplified = simplifyPath(state.currentBrushPath, CONFIG.pathSimplificationThreshold / state.zoom); layer.paths.push(new Path(simplified)); saveHistory(); } } if (state.isErasing) { const layer = getActiveLayer(); if (layer && state.pathsToErase.size > 0) { layer.paths = layer.paths.filter(p => !state.pathsToErase.has(p.id)); saveHistory(); } } state.isDrawing = false; state.isErasing = false; state.drag.isActive = false; state.currentBrushPath = []; state.pathsToErase.clear(); render(); });
+        DOM.viewport.addEventListener('pointerleave', () => { state.isCursorInCanvas = false; state.isDrawing = false; state.isErasing = false; state.drag.isActive = false; state.currentBrushPath = []; state.pathsToErase.clear(); render(); });
         DOM.viewport.addEventListener('pointerenter', () => { state.isCursorInCanvas = true; });
         function startDrag(e) { state.drag.isActive = true; state.drag.startX = e.clientX; state.drag.startY = e.clientY; state.drag.startPanX = state.panX; state.drag.startPanY = state.panY; }
         function doDrag(e) { if (!state.drag.isActive) return; state.panX = state.drag.startPanX + (e.clientX - state.drag.startX); state.panY = state.drag.startPanY + (e.clientY - state.drag.startY); render(); }
-        
         DOM.viewport.addEventListener('wheel', e => { e.preventDefault(); if (e.shiftKey) { state.viewRotation += (e.deltaY > 0 ? -5 : 5); if (state.snapToMidline) snapRotation(); DOM.rotationSlider.value = state.viewRotation; } else { const rect = DOM.mainCanvas.getBoundingClientRect(); const mx = e.clientX - rect.left, my = e.clientY - rect.top; const zoomFactor = 1.1; let newZoom = state.zoom * (e.deltaY < 0 ? zoomFactor : 1 / zoomFactor); newZoom = Math.max(0.1, Math.min(newZoom, 10)); const offsetX = (mx - state.panX), offsetY = (my - state.panY); state.panX = mx - (offsetX * (newZoom / state.zoom)); state.panY = my - (offsetY * (newZoom / state.zoom)); state.zoom = newZoom; } render(); }, { passive: false });
         
-        window.addEventListener('keydown', e => {
-            if (e.target.matches('input')) return;
-            if (e.ctrlKey || e.metaKey) {
-                // 修复关键点：改为 toLowerCase() 不区分大小写，确保 Ctrl+Shift+Z 能触发
-                if (e.key.toLowerCase() === 'z' && e.shiftKey) { 
-                    e.preventDefault(); 
-                    redo(); 
-                }
-                else if (e.key.toLowerCase() === 'z') { 
-                    e.preventDefault(); 
-                    undo(); 
-                }
-                if (e.key.toLowerCase() === 'y') { 
-                    e.preventDefault(); 
-                    redo(); 
-                }
-                if (e.key === '0') { 
-                    e.preventDefault(); 
-                    centerView(); 
-                }
-                return;
-            }
-            if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
-                e.preventDefault();
-                const direction = e.code === 'ArrowLeft' ? 1 : -1;
-                state.viewRotation += direction * (360 / state.sliceCount);
-                state.viewRotation = (state.viewRotation % 360 + 360) % 360;
-                if (state.isDrawing) state.currentBrushPath.push({ x: state.cursorWorldX, y: state.cursorWorldY });
-                if (state.snapToMidline) snapRotation();
-                DOM.rotationSlider.value = state.viewRotation;
-                render();
-            }
-            if(e.key === '[' || e.key === ']') {
-                const layer = getActiveLayer();
-                if(layer) {
-                    const change = e.key === '[' ? -1 : 1;
-                    const newWidth = Math.max(1, Math.min(100, parseInt(layer.strokeWidth) + change));
-                    changeActiveLayerProperty('strokeWidth', newWidth);
-                }
-            }
-            if (e.code === 'Space' && !e.repeat) { 
-                e.preventDefault(); 
-                state.isPanning = true; 
-                DOM.viewport.classList.add('panning');
-                state.isRotating = false;
-                DOM.viewport.classList.remove('rotating');
-            }
-            if (e.code === 'KeyR' && !e.repeat) { 
-                if (!state.isPanning) { 
-                    state.isRotating = true; 
-                    DOM.viewport.classList.add('rotating');
-                }
-            }
-            if (e.code === 'KeyB') { 
-                if (!state.isPanning) { 
-                    state.currentTool = 'brush'; 
-                    DOM.viewport.classList.remove('erasing'); 
-                    updateUI();
-                }
-            }
-            if (e.code === 'KeyE') { 
-                if (!state.isPanning) { 
-                    state.currentTool = 'eraser'; 
-                    DOM.viewport.classList.add('erasing'); 
-                    updateUI();
-                }
-            }
-        });
-        window.addEventListener('keyup', e => { 
-            if (e.code === 'Space') { 
-                state.isPanning = false; 
-                DOM.viewport.classList.remove('panning');
-                resetInteractionState();
-                render();
-            }
-            if (e.code === 'KeyR') { 
-                if (!state.isPanning) { 
-                    state.isRotating = false; 
-                    DOM.viewport.classList.remove('rotating'); 
-                    if (state.snapToMidline) { snapRotation(); render(); }
-                }
-            }
-        });
-        window.addEventListener('blur', () => {
-            state.isPanning = false;
-            DOM.viewport.classList.remove('panning', 'rotating');
-            resetInteractionState();
-        });
+        window.addEventListener('keydown', e => { if (e.target.matches('input')) return; if (e.ctrlKey || e.metaKey) { if (e.key.toLowerCase() === 'z' && e.shiftKey) { e.preventDefault(); redo(); } else if (e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); } if (e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); } if (e.key === '0') { e.preventDefault(); centerView(); } return; } if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') { e.preventDefault(); const direction = e.code === 'ArrowLeft' ? 1 : -1; state.viewRotation += direction * (360 / state.sliceCount); state.viewRotation = (state.viewRotation % 360 + 360) % 360; if (state.isDrawing) state.currentBrushPath.push({ x: state.cursorWorldX, y: state.cursorWorldY }); if (state.snapToMidline) snapRotation(); DOM.rotationSlider.value = state.viewRotation; render(); } if(e.key === '[' || e.key === ']') { const layer = getActiveLayer(); if(layer) { const change = e.key === '[' ? -1 : 1; const newWidth = Math.max(1, Math.min(100, parseInt(layer.strokeWidth) + change)); changeActiveLayerProperty('strokeWidth', newWidth); } } if (e.code === 'Space' && !e.repeat) { e.preventDefault(); state.isPanning = true; DOM.viewport.classList.add('panning'); state.isRotating = false; DOM.viewport.classList.remove('rotating'); } if (e.code === 'KeyR' && !e.repeat) { if (!state.isPanning) { state.isRotating = true; DOM.viewport.classList.add('rotating'); } } if (e.code === 'KeyB') { if (!state.isPanning) { state.currentTool = 'brush'; DOM.viewport.classList.remove('erasing'); updateUI(); } } if (e.code === 'KeyE') { if (!state.isPanning) { state.currentTool = 'eraser'; DOM.viewport.classList.add('erasing'); updateUI(); } } });
+        window.addEventListener('keyup', e => { if (e.code === 'Space') { state.isPanning = false; DOM.viewport.classList.remove('panning'); resetInteractionState(); render(); } if (e.code === 'KeyR') { if (!state.isPanning) { state.isRotating = false; DOM.viewport.classList.remove('rotating'); if (state.snapToMidline) { snapRotation(); render(); } } } });
+        window.addEventListener('blur', () => { state.isPanning = false; DOM.viewport.classList.remove('panning', 'rotating'); resetInteractionState(); });
+        window.addEventListener('beforeunload', (e) => { if (state.hasUnsavedChanges) { e.preventDefault(); e.returnValue = ''; } });
 
+        DOM.projectNameInput.onchange = e => { state.projectName = e.target.value.trim() || '未命名项目'; setUnsaved(true); updateUI(); };
         DOM.addLayerBtn.onclick = () => addLayer();
         DOM.delLayerBtn.onclick = deleteLayer;
+        DOM.copyLayerBtn.onclick = duplicateLayer;
         DOM.clearLayerBtn.onclick = clearLayer;
         DOM.undoBtn.onclick = undo;
         DOM.redoBtn.onclick = redo;
         DOM.resetViewBtn.onclick = centerView;
-        
         DOM.currentLayerInput.onchange = e => changeActiveLayerProperty('name', e.target.value);
         DOM.layerColorInput.oninput = e => changeActiveLayerProperty('color', e.target.value);
         DOM.brushSize.oninput = e => { const layer = getActiveLayer(); if (layer) { layer.strokeWidth = e.target.value; updateUI(); render(); } };
@@ -544,64 +448,68 @@
         DOM.layerOpacity.oninput = e => { const layer = getActiveLayer(); if (layer) { layer.opacity = parseFloat(e.target.value); updateUI(); render(); } };
         DOM.layerOpacity.onchange = () => saveHistory();
         DOM.backgroundColorInput.oninput = e => { state.backgroundColor = e.target.value; updateUI(); render(); };
-
         DOM.modeFillBtn.onclick = () => { if (!state.isPanning) { state.currentTool = 'brush'; DOM.viewport.classList.remove('erasing'); changeActiveLayerProperty('mode', 'fill'); } };
         DOM.modeStrokeBtn.onclick = () => { if (!state.isPanning) { state.currentTool = 'brush'; DOM.viewport.classList.remove('erasing'); changeActiveLayerProperty('mode', 'stroke'); } };
         DOM.toolEraserBtn.onclick = () => { if (!state.isPanning) { state.currentTool = 'eraser'; DOM.viewport.classList.add('erasing'); updateUI(); } };
-        
-        DOM.onionToggle.onchange = e => { state.onionEnabled = e.target.checked; render(); };
-        DOM.onionOpacity.oninput = e => { state.onionOpacity = parseFloat(e.target.value); DOM.onionOpacityVal.textContent = state.onionOpacity.toFixed(2); render(); };
+        DOM.onionToggle.onchange = e => { state.onionSkins.enabled = e.target.checked; updateUI(); render(); };
+        DOM.onionBeforeToggle.onchange = e => { state.onionSkins.showBefore = e.target.checked; updateUI(); render(); };
+        DOM.onionAfterToggle.onchange = e => { state.onionSkins.showAfter = e.target.checked; updateUI(); render(); };
+        DOM.onionOpacity.oninput = e => { state.onionSkins.opacity = parseFloat(e.target.value); updateUI(); render(); };
         DOM.snapToggle.onchange = e => { state.snapToMidline = e.target.checked; if (state.snapToMidline) { snapRotation(); render(); } };
-        // 修复：修改扇形数时不自动对齐中线，视角不变
         DOM.sliceCount.onchange = e => { state.sliceCount = parseInt(e.target.value); render(); };
         DOM.rotationSlider.oninput = e => { state.viewRotation = parseFloat(e.target.value); render(); };
         DOM.rotationSlider.onchange = () => { if (state.snapToMidline) { snapRotation(); render(); } };
-        
-        DOM.exportJsonBtn.onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({version: '9.9', state})], {type: 'application/json'})); a.download = `vector_project_${Date.now()}.json`; a.click(); URL.revokeObjectURL(a.href); setUnsaved(false); };
-        DOM.importJsonInput.onchange = e => {
-            if (!e.target.files.length) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-                try {
-                    const data = JSON.parse(reader.result);
-                    if (data.state) {
-                        const persistentState = {
-                            layers: data.state.layers, activeLayerIndex: data.state.activeLayerIndex, sliceCount: data.state.sliceCount,
-                            rotDirection: data.state.rotDirection, backgroundColor: data.state.backgroundColor || '#ffffff', zoom: data.state.zoom,
-                            panX: data.state.panX, panY: data.state.panY, viewRotation: data.state.viewRotation, onionEnabled: data.state.onionEnabled,
-                            onionOpacity: data.state.onionOpacity, onionOnTop: data.state.onionOnTop || true, snapToMidline: data.state.snapToMidline, fps: data.state.fps, playbackMode: data.state.playbackMode || 'slice'
-                        };
-                        Object.assign(state, persistentState);
-                        resetInteractionState();
-                        setActiveLayer(state.activeLayerIndex);
-                        saveHistory();
-                        setUnsaved(false);
-                    }
-                } catch (err) { alert('导入失败: 无效的文件格式'); console.error(err); }
-            };
-            reader.readAsText(e.target.files[0]);
-            e.target.value = '';
-        };
-        DOM.resetAllBtn.onclick = () => { if (confirm('确定要重置所有内容吗？')) { state.layers = []; state.backgroundColor = '#ffffff'; addLayer('图层 1'); state.rotDirection = 1; state.onionOpacity = 0.5; centerView(); updateUI(); saveHistory(); } };
-
+        DOM.resetAllBtn.onclick = () => { if (confirm('确定要重置所有内容吗？')) { state.layers = []; state.projectName = '未命名项目'; state.backgroundColor = '#ffffff'; addLayer('图层 1'); state.rotDirection = 1; state.onionSkins.opacity = 0.5; centerView(); updateUI(); saveHistory(); setUnsaved(false); } };
         DOM.fpsRange.oninput = e => { state.fps = parseInt(e.target.value); DOM.fpsVal.textContent = state.fps; };
         DOM.rotateDirBtn.onclick = function() { state.rotDirection *= -1; this.textContent = state.rotDirection === 1 ? '↺ 反向' : '↻ 正向'; this.classList.toggle('active', state.rotDirection === -1); };
         DOM.playbackModeBtn.onclick = function() { state.playbackMode = state.playbackMode === 'slice' ? 'uniform' : 'slice'; this.textContent = state.playbackMode === 'slice' ? '逐格模式' : '匀速模式'; };
-        DOM.playBtn.onclick = () => { state.isPlaying = !state.isPlaying; DOM.playBtn.textContent = state.isPlaying ? '■ 停止' : '▶ 播放'; DOM.playBtn.classList.toggle('active', !state.isPlaying); DOM.playBtn.style.background = state.isPlaying ? 'var(--danger-color)' : ''; if (!state.isPlaying) { state.animRotation = 0; render(); } };
-        // 洋葱皮层级切换按钮点击事件
-        DOM.onionLayerBtn.onclick = () => {
-            state.onionOnTop = !state.onionOnTop;
-            updateUI();
-            render();
+        DOM.playBtn.onclick = () => { state.isPlaying = !state.isPlaying; DOM.playBtn.textContent = state.isPlaying ? '■ 停止' : '▶ 播放'; DOM.playBtn.classList.toggle('active', state.isPlaying); DOM.playBtn.style.background = state.isPlaying ? 'var(--danger-color)' : ''; if (!state.isPlaying) { state.animRotation = 0; render(); } };
+        DOM.onionLayerBtn.onclick = () => { state.onionOnTop = !state.onionOnTop; updateUI(); render(); };
+
+        DOM.exportJsonBtn.onclick = async () => {
+            const originalButtonText = DOM.exportJsonBtn.textContent;
+            DOM.exportJsonBtn.textContent = '正在打包...';
+            DOM.exportJsonBtn.disabled = true;
+            try {
+                const unsafeName = state.projectName || '未命名项目';
+                const safeFilename = unsafeName.replace(/[\\/:*?"<>|]/g, '_').trim() || `phenaki_project_${Date.now()}`;
+                const dataToExport = { version: '12.0', state: state };
+                const jsonString = JSON.stringify(dataToExport, null, 2);
+                const pngDataUrl = DOM.mainCanvas.toDataURL('image/png');
+                const pngBlob = dataURLtoBlob(pngDataUrl);
+                const zip = new JSZip();
+                zip.file(`${safeFilename}.json`, jsonString);
+                zip.file(`${safeFilename}.png`, pngBlob);
+                const zipBlob = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 9 } });
+                triggerDownload(zipBlob, `${safeFilename}.zip`);
+                setUnsaved(false);
+            } catch (error) { console.error("导出 ZIP 失败:", error); alert("导出失败，请打开开发者控制台查看错误信息。"); } finally { DOM.exportJsonBtn.textContent = originalButtonText; DOM.exportJsonBtn.disabled = false; }
+        };
+        DOM.importJsonInput.onchange = async (e) => {
+            if (!e.target.files.length) return;
+            const file = e.target.files[0];
+            e.target.value = '';
+            if (file.name.endsWith('.zip')) {
+                try {
+                    const zip = await JSZip.loadAsync(file);
+                    const jsonFileKey = Object.keys(zip.files).find(name => name.endsWith('.json'));
+                    if (!jsonFileKey) { alert('导入失败: ZIP压缩包中未找到 .json 项目文件。'); return; }
+                    const jsonString = await zip.files[jsonFileKey].async('string');
+                    loadProjectData(jsonString, file.name);
+                } catch (err) { alert('导入失败: 无法读取或解压 ZIP 文件。\n' + err.message); console.error(err); }
+            } else if (file.name.endsWith('.json')) {
+                const reader = new FileReader();
+                reader.onload = () => { loadProjectData(reader.result, file.name); };
+                reader.onerror = () => { alert('导入失败: 无法读取 JSON 文件。'); };
+                reader.readAsText(file);
+            } else { alert('请选择一个 .json 或 .zip 文件。'); }
         };
     }
 
     function getScreenToWorldPos(screenX, screenY) {
         const rect = DOM.viewport.getBoundingClientRect();
-        const viewX = screenX - rect.left;
-        const viewY = screenY - rect.top;
-        const worldX = (viewX - state.panX) / state.zoom;
-        const worldY = (viewY - state.panY) / state.zoom;
+        const viewX = screenX - rect.left; const viewY = screenY - rect.top;
+        const worldX = (viewX - state.panX) / state.zoom; const worldY = (viewY - state.panY) / state.zoom;
         const cx = CONFIG.baseSize / 2, cy = CONFIG.baseSize / 2;
         const dx = worldX - cx, dy = worldY - cy;
         const dynamicRotation = state.isPlaying ? state.animRotation : 0;
@@ -618,7 +526,6 @@
             if (!window._lastTime) window._lastTime = time;
             const deltaTime = time - window._lastTime;
             window._lastTime = time;
-
             if (state.playbackMode === 'slice') {
                 if (!window._sliceTime) window._sliceTime = 0;
                 window._sliceTime += deltaTime;
@@ -633,23 +540,49 @@
                 state.animRotation = (state.animRotation - (rotationThisFrame * state.rotDirection));
             }
             render();
-
-            // 新增：在播放模式下，如果鼠标是按下的状态，则持续绘制
             if (state.isDrawing && state.isCursorInCanvas) {
-                // 获取鼠标当前在屏幕上的位置，并将其转换为旋转中的画布的世界坐标
                 const rect = DOM.viewport.getBoundingClientRect();
                 const worldPos = getScreenToWorldPos(rect.left + state.cursorScreenX, rect.top + state.cursorScreenY);
-                // 将新计算出的点添加到当前正在绘制的路径中
                 state.currentBrushPath.push(worldPos);
             }
-
-        } else {
-            window._lastTime = 0;
-            window._sliceTime = 0;
-        }
+        } else { window._lastTime = 0; window._sliceTime = 0; }
         requestAnimationFrame(loop);
     }
-    function drawGrid(ctx) { const cx = CONFIG.baseSize / 2, cy = CONFIG.baseSize / 2, r = CONFIG.baseSize / 2 - 2; const step = 360 / state.sliceCount; const offset = step / 2; const z = state.zoom || 1; const lw = 1/z; ctx.setLineDash([]); ctx.strokeStyle = 'rgba(0,188,212,0.2)'; ctx.lineWidth = lw; ctx.beginPath(); for (let i = 0; i < state.sliceCount; i++) { const rad = (i * step + offset) * Math.PI / 180; ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(rad)*r, cy + Math.sin(rad)*r); } ctx.stroke(); ctx.beginPath(); ctx.strokeStyle = 'rgba(255,50,50,0.5)'; ctx.lineWidth = 2/z; ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - r); ctx.stroke(); }
+    
+    function drawGrid(ctx) { 
+        const cx = CONFIG.baseSize / 2, cy = CONFIG.baseSize / 2, r = CONFIG.baseSize / 2 - 2; 
+        const step = 360 / state.sliceCount; 
+        const offset = step / 2; 
+        const z = state.zoom || 1; 
+        const lw = 1/z; 
+        ctx.setLineDash([]); 
+        ctx.strokeStyle = 'rgba(0,188,212,0.2)'; 
+        ctx.lineWidth = lw; 
+        ctx.beginPath(); 
+        for (let i = 0; i < state.sliceCount; i++) { 
+            const rad = (i * step + offset) * Math.PI / 180; 
+            ctx.moveTo(cx, cy); 
+            ctx.lineTo(cx + Math.cos(rad)*r, cy + Math.sin(rad)*r); 
+        } 
+        ctx.stroke(); 
+        ctx.strokeStyle = 'rgba(200, 200, 200, 0.3)';
+        ctx.setLineDash([4/z, 4/z]);
+        ctx.beginPath();
+        for (let i = 0; i < state.sliceCount; i++) {
+            const rad = (i * step) * Math.PI / 180;
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(rad) * r, cy + Math.sin(rad) * r);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath(); 
+        ctx.strokeStyle = 'rgba(255,50,50,0.5)'; 
+        ctx.lineWidth = 2/z; 
+        ctx.moveTo(cx, cy); 
+        ctx.lineTo(cx, cy - r); 
+        ctx.stroke(); 
+    }
+
     function snapRotation() { if (!state.snapToMidline) return; const step = 360 / state.sliceCount; state.viewRotation = Math.round(state.viewRotation / step) * step; state.viewRotation = (state.viewRotation % 360 + 360) % 360; }
     function centerView() { const w = DOM.viewport.clientWidth, h = DOM.viewport.clientHeight; if(!w || !h) return; state.zoom = Math.min(w, h) / CONFIG.baseSize * 0.9; state.panX = (w - CONFIG.baseSize * state.zoom) / 2; state.panY = (h - CONFIG.baseSize * state.zoom) / 2; state.viewRotation = 0; snapRotation(); DOM.rotationSlider.value = 0; render(); }
     
