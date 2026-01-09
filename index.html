@@ -2,14 +2,14 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>费纳奇镜 v9.9 UI & UX Polish</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>费纳奇镜 v9.9 纯桌面版（空格持续拖拽）</title>
     <style>
         :root {
             --bg-color: #181818; --panel-color: #252525; --item-color: #333;
             --text-color: #e0e0e0; --accent-color: #00bcd4; --danger-color: #e74c3c;
         }
-        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; display: flex; height: 100vh; overflow: hidden; user-select: none; touch-action: none; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; display: flex; height: 100vh; overflow: hidden; user-select: none; }
         .viewport { flex: 1; position: relative; background-color: #111; overflow: hidden; background-image: linear-gradient(45deg, #1a1a1a 25%, transparent 25%), linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1a1a1a 75%), linear-gradient(-45deg, transparent 75%, #1a1a1a 75%); background-size: 20px 20px; cursor: none; min-width: 300px; }
         .viewport.panning { cursor: grab !important; }
         .viewport.panning:active { cursor: grabbing !important; }
@@ -29,7 +29,7 @@
         .section-header { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #888; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
         .btn-group { display: flex; width: 100%; gap: 1px; background: #222; border-radius: 4px; overflow: hidden; }
-        .btn-group-full { display:flex; flex-wrap: wrap; gap:5px; margin-top:8px;}
+        .btn-group-full { display:flex; flex-wrap: wrap; gap:5px; marginTop:8px;}
         button, .btn-label { background-color: #444; color: #ddd; border: none; padding: 6px 10px; cursor: pointer; flex: 1; font-size: 12px; transition: 0.1s; text-align: center; display: inline-block; line-height: normal; }
         button:hover, .btn-label:hover { background-color: #555; }
         button:disabled { background-color: #333; color: #777; cursor: not-allowed; }
@@ -59,7 +59,7 @@
 <body>
     <div class="viewport" id="viewport">
         <div class="save-indicator"> <div class="dot saved" id="statusDot"></div> <span id="statusText">已保存</span> </div>
-        <div class="status-bar">双指: 缩放/旋转/轻点撤销 | 三指: 轻点重做</div>
+        <div class="status-bar">滚轮:缩放/Shift+滚轮:旋转 | 空格:持续拖拽(按住) | R:旋转模式 | B:画笔 E:橡皮擦</div>
         <canvas id="mainCanvas"></canvas>
     </div>
     <div class="sidebar">
@@ -141,7 +141,7 @@
     </div>
 
 <script>
-    const CONFIG = { baseSize: 500, maxHistory: 50, pathSimplificationThreshold: 1.5, tapThreshold: 250, tapMoveThreshold: 10 };
+    const CONFIG = { baseSize: 500, maxHistory: 50, pathSimplificationThreshold: 1.5 };
 
     class Path { constructor(points) { this.id = Date.now() + Math.random(); this.points = points; } }
     class Layer {
@@ -158,7 +158,6 @@
         currentTool: 'brush', currentBrushPath: [], pathsToErase: new Set(),
         drag: { isActive: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 },
         draggedLayerId: null,
-        gesture: { type: null, startDist: 0, startAngle: 0, startZoom: 1, startViewRotation: 0, lastTapTime: 0, startPoints: [] },
         dragStartAngle: 0, dragStartViewRot: 0, cursorWorldX: 0, cursorWorldY: 0, cursorScreenX: 0, cursorScreenY: 0, isCursorInCanvas: false,
         onionEnabled: true, onionOpacity: 0.5, snapToMidline: true, hasUnsavedChanges: false, dpr: 1, fps: 12
     };
@@ -202,7 +201,7 @@
             ctx.save(); setupTransform(ctx); drawGrid(ctx); ctx.restore();
         }
         
-        if (state.isCursorInCanvas && !state.isPanning && !state.isRotating && state.gesture.type === null) {
+        if (state.isCursorInCanvas && !state.isPanning && !state.isRotating) {
             const activeLayer = getActiveLayer();
             if (activeLayer) {
                 ctx.save();
@@ -218,7 +217,7 @@
                     ctx.moveTo(state.cursorScreenX, state.cursorScreenY - crosshairSize);
                     ctx.lineTo(state.cursorScreenX, state.cursorScreenY + crosshairSize);
                     ctx.stroke();
-                } else { // Stroke mode brush
+                } else {
                     const cursorRadius = (activeLayer.strokeWidth / 2) * state.zoom;
                     ctx.beginPath();
                     ctx.arc(state.cursorScreenX, state.cursorScreenY, cursorRadius, 0, 2 * Math.PI);
@@ -335,15 +334,16 @@
     function handleDragEnd(e) { e.currentTarget.classList.remove('dragging'); document.querySelectorAll('.layer-item').forEach(el => el.classList.remove('drag-over')); }
     
     function resetInteractionState() {
-        state.isPanning = false; state.isRotating = false; state.isDrawing = false; state.isErasing = false;
-        state.drag.isActive = false; state.currentBrushPath = []; state.pathsToErase.clear();
-        state.gesture.type = null;
-        DOM.viewport.classList.remove('panning', 'rotating');
+        // 只有在空格键未按下时才完全重置
+        if (!state.isPanning) {
+            state.isRotating = false; state.isDrawing = false; state.isErasing = false;
+            state.drag.isActive = false; state.currentBrushPath = []; state.pathsToErase.clear();
+            DOM.viewport.classList.remove('rotating');
+        }
     }
 
     function bindEvents() {
         DOM.viewport.addEventListener('pointerdown', e => {
-            if (e.pointerType === 'touch' && e.isPrimary && state.gesture.type) return;
             if (!e.isPrimary) return;
             DOM.viewport.setPointerCapture(e.pointerId); state.isCursorInCanvas = true;
             if (e.button === 1 || state.isPanning) { startDrag(e); return; }
@@ -360,7 +360,6 @@
             if (!e.isPrimary) return;
             state.cursorScreenX = e.clientX - DOM.viewport.getBoundingClientRect().left;
             state.cursorScreenY = e.clientY - DOM.viewport.getBoundingClientRect().top;
-            if (state.gesture.type) return;
 
             const worldPos = getScreenToWorldPos(e.clientX, e.clientY);
             state.cursorWorldX = worldPos.x; state.cursorWorldY = worldPos.y;
@@ -382,27 +381,34 @@
                 const layer = getActiveLayer();
                 if (layer && state.pathsToErase.size > 0) { layer.paths = layer.paths.filter(p => !state.pathsToErase.has(p.id)); saveHistory(); setUnsaved(true); }
             }
-            resetInteractionState(); render();
+            // 鼠标松开时只结束当前操作，不取消空格键拖拽模式
+            state.isDrawing = false; state.isErasing = false;
+            state.drag.isActive = false;
+            state.currentBrushPath = []; state.pathsToErase.clear();
+            render();
         });
-        DOM.viewport.addEventListener('pointerleave', () => { state.isCursorInCanvas = false; resetInteractionState(); render(); });
+        DOM.viewport.addEventListener('pointerleave', () => { 
+            state.isCursorInCanvas = false; 
+            // 指针离开时同样保留空格键拖拽状态
+            state.isDrawing = false; state.isErasing = false;
+            state.drag.isActive = false;
+            state.currentBrushPath = []; state.pathsToErase.clear();
+            render(); 
+        });
         DOM.viewport.addEventListener('pointerenter', () => { state.isCursorInCanvas = true; });
         function startDrag(e) { state.drag.isActive = true; state.drag.startX = e.clientX; state.drag.startY = e.clientY; state.drag.startPanX = state.panX; state.drag.startPanY = state.panY; }
         function doDrag(e) { if (!state.drag.isActive) return; state.panX = state.drag.startPanX + (e.clientX - state.drag.startX); state.panY = state.drag.startPanY + (e.clientY - state.drag.startY); render(); }
-        function endDrag() { state.drag.isActive = false; }
         
-        // Touch Gestures
-        DOM.viewport.addEventListener('touchstart', handleTouchStart, { passive: false });
-        DOM.viewport.addEventListener('touchmove', handleTouchMove, { passive: false });
-        DOM.viewport.addEventListener('touchend', handleTouchEnd, { passive: false });
-        
-        // Wheel and Keyboard events
+        // 滚轮缩放/旋转
         DOM.viewport.addEventListener('wheel', e => { e.preventDefault(); if (e.shiftKey) { state.viewRotation += (e.deltaY > 0 ? -5 : 5); if (state.snapToMidline) snapRotation(); DOM.rotationSlider.value = state.viewRotation; } else { const rect = DOM.mainCanvas.getBoundingClientRect(); const mx = e.clientX - rect.left, my = e.clientY - rect.top; const zoomFactor = 1.1; let newZoom = state.zoom * (e.deltaY < 0 ? zoomFactor : 1 / zoomFactor); newZoom = Math.max(0.1, Math.min(newZoom, 10)); const offsetX = (mx - state.panX), offsetY = (my - state.panY); state.panX = mx - (offsetX * (newZoom / state.zoom)); state.panY = my - (offsetY * (newZoom / state.zoom)); state.zoom = newZoom; } render(); }, { passive: false });
+        
+        // 键盘快捷键 - 核心修改：空格键持续控制拖拽模式
         window.addEventListener('keydown', e => {
             if (e.target.matches('input')) return;
             if (e.ctrlKey || e.metaKey) {
                 if (e.key === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
                 else if (e.key === 'z') { e.preventDefault(); undo(); }
-                if (e.key === 'y') { e.preventDefault(); redo(); } // For Windows
+                if (e.key === 'y') { e.preventDefault(); redo(); }
                 if (e.key === '0') { e.preventDefault(); centerView(); }
                 return;
             }
@@ -424,15 +430,60 @@
                     changeActiveLayerProperty('strokeWidth', newWidth);
                 }
             }
-            if (e.code === 'Space' && !e.repeat) { e.preventDefault(); state.isPanning = true; DOM.viewport.classList.add('panning'); }
-            if (e.code === 'KeyR' && !e.repeat) { state.isRotating = true; DOM.viewport.classList.add('rotating'); }
-            if (e.code === 'KeyB') { state.currentTool = 'brush'; DOM.viewport.classList.remove('erasing'); updateUI(); }
-            if (e.code === 'KeyE') { state.currentTool = 'eraser'; DOM.viewport.classList.add('erasing'); updateUI(); }
+            // 空格键：按下立即激活拖拽，持续保持
+            if (e.code === 'Space' && !e.repeat) { 
+                e.preventDefault(); 
+                state.isPanning = true; 
+                DOM.viewport.classList.add('panning');
+                // 取消其他可能的操作状态
+                state.isRotating = false;
+                DOM.viewport.classList.remove('rotating');
+            }
+            if (e.code === 'KeyR' && !e.repeat) { 
+                if (!state.isPanning) { // 空格键优先，不被R键打断
+                    state.isRotating = true; 
+                    DOM.viewport.classList.add('rotating');
+                }
+            }
+            if (e.code === 'KeyB') { 
+                if (!state.isPanning) { // 空格键优先，不被B键打断
+                    state.currentTool = 'brush'; 
+                    DOM.viewport.classList.remove('erasing'); 
+                    updateUI();
+                }
+            }
+            if (e.code === 'KeyE') { 
+                if (!state.isPanning) { // 空格键优先，不被E键打断
+                    state.currentTool = 'eraser'; 
+                    DOM.viewport.classList.add('erasing'); 
+                    updateUI();
+                }
+            }
         });
-        window.addEventListener('keyup', e => { if (e.code === 'Space') { state.isPanning = false; DOM.viewport.classList.remove('panning'); } if (e.code === 'KeyR') { state.isRotating = false; DOM.viewport.classList.remove('rotating'); if (state.snapToMidline) { snapRotation(); render(); } } });
-        window.addEventListener('blur', resetInteractionState);
+        window.addEventListener('keyup', e => { 
+            // 空格键释放时才取消拖拽模式
+            if (e.code === 'Space') { 
+                state.isPanning = false; 
+                DOM.viewport.classList.remove('panning');
+                resetInteractionState(); // 完全重置所有交互状态
+                render();
+            }
+            if (e.code === 'KeyR') { 
+                if (!state.isPanning) { // 只有空格键未按住时才取消旋转模式
+                    state.isRotating = false; 
+                    DOM.viewport.classList.remove('rotating'); 
+                    if (state.snapToMidline) { snapRotation(); render(); }
+                }
+            }
+        });
+        window.addEventListener('blur', () => {
+            // 窗口失焦时完全重置所有状态
+            state.isPanning = false;
+            DOM.viewport.classList.remove('panning', 'rotating');
+            resetInteractionState();
+        });
 
-        // Sidebar Events
+        // 侧边栏按钮事件
         DOM.addLayerBtn.onclick = () => addLayer();
         DOM.delLayerBtn.onclick = deleteLayer;
         DOM.clearLayerBtn.onclick = clearLayer;
@@ -448,9 +499,9 @@
         DOM.layerOpacity.onchange = () => saveHistory();
         DOM.backgroundColorInput.oninput = e => { state.backgroundColor = e.target.value; updateUI(); render(); };
 
-        DOM.modeFillBtn.onclick = () => { state.currentTool = 'brush'; DOM.viewport.classList.remove('erasing'); changeActiveLayerProperty('mode', 'fill'); };
-        DOM.modeStrokeBtn.onclick = () => { state.currentTool = 'brush'; DOM.viewport.classList.remove('erasing'); changeActiveLayerProperty('mode', 'stroke'); };
-        DOM.toolEraserBtn.onclick = () => { state.currentTool = 'eraser'; DOM.viewport.classList.add('erasing'); updateUI(); };
+        DOM.modeFillBtn.onclick = () => { if (!state.isPanning) { state.currentTool = 'brush'; DOM.viewport.classList.remove('erasing'); changeActiveLayerProperty('mode', 'fill'); } };
+        DOM.modeStrokeBtn.onclick = () => { if (!state.isPanning) { state.currentTool = 'brush'; DOM.viewport.classList.remove('erasing'); changeActiveLayerProperty('mode', 'stroke'); } };
+        DOM.toolEraserBtn.onclick = () => { if (!state.isPanning) { state.currentTool = 'eraser'; DOM.viewport.classList.add('erasing'); updateUI(); } };
         
         DOM.onionToggle.onchange = e => { state.onionEnabled = e.target.checked; render(); };
         DOM.onionOpacity.oninput = e => { state.onionOpacity = parseFloat(e.target.value); DOM.onionOpacityVal.textContent = state.onionOpacity.toFixed(2); render(); };
@@ -491,54 +542,6 @@
         DOM.playbackModeBtn.onclick = function() { state.playbackMode = state.playbackMode === 'slice' ? 'uniform' : 'slice'; this.textContent = state.playbackMode === 'slice' ? '逐格模式' : '匀速模式'; };
         DOM.playBtn.onclick = () => { state.isPlaying = !state.isPlaying; DOM.playBtn.textContent = state.isPlaying ? '■ 停止' : '▶ 播放'; DOM.playBtn.classList.toggle('active', !state.isPlaying); DOM.playBtn.style.background = state.isPlaying ? 'var(--danger-color)' : ''; if (!state.isPlaying) { state.animRotation = 0; render(); } };
     }
-    
-    // --- Touch Gesture Handlers ---
-    function handleTouchStart(e) {
-        if (e.touches.length > 1) e.preventDefault();
-        resetInteractionState();
-        state.gesture.startPoints = Array.from(e.touches).map(t => ({x: t.clientX, y: t.clientY}));
-        state.gesture.lastTapTime = Date.now();
-        if (e.touches.length === 2) {
-            state.gesture.type = 'pinch-rotate';
-            state.gesture.startDist = getTouchDistance(e.touches);
-            state.gesture.startAngle = getTouchAngle(e.touches);
-            state.gesture.startZoom = state.zoom;
-            state.gesture.startViewRotation = state.viewRotation;
-        }
-    }
-    function handleTouchMove(e) {
-        if (state.gesture.type === 'pinch-rotate' && e.touches.length === 2) {
-            e.preventDefault();
-            const newDist = getTouchDistance(e.touches);
-            const newAngle = getTouchAngle(e.touches);
-            const scale = newDist / state.gesture.startDist;
-            state.zoom = Math.max(0.1, Math.min(state.gesture.startZoom * scale, 10));
-            const angleDiff = newAngle - state.gesture.startAngle;
-            state.viewRotation = state.gesture.startViewRotation + angleDiff;
-            render();
-        }
-    }
-    function handleTouchEnd(e) {
-        const time = Date.now();
-        const tapDuration = time - state.gesture.lastTapTime;
-        if (tapDuration < CONFIG.tapThreshold) {
-            const startPoints = state.gesture.startPoints;
-            const endPoints = Array.from(e.changedTouches).map(t => ({x: t.clientX, y: t.clientY}));
-            let totalMove = 0;
-            for(let i=0; i < Math.min(startPoints.length, endPoints.length); i++) {
-                totalMove += Math.hypot(startPoints[i].x - endPoints[i].x, startPoints[i].y - endPoints[i].y);
-            }
-
-            if (totalMove < CONFIG.tapMoveThreshold * startPoints.length) {
-                if (startPoints.length === 2) { undo(); }
-                if (startPoints.length === 3) { redo(); }
-            }
-        }
-        resetGestureState();
-    }
-    function getTouchDistance(touches) { return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY); }
-    function getTouchAngle(touches) { return Math.atan2(touches[0].clientY - touches[1].clientY, touches[0].clientX - touches[1].clientX) * 180 / Math.PI; }
-    function resetGestureState() { state.gesture.type = null; state.gesture.startPoints = []; }
 
     function getScreenToWorldPos(screenX, screenY) {
         const rect = DOM.viewport.getBoundingClientRect();
@@ -571,7 +574,7 @@
                     state.animRotation = (state.animRotation - (step * state.rotDirection));
                     window._sliceTime = 0;
                 }
-            } else { // uniform mode
+            } else {
                 const degreesPerSecond = state.fps * 6;
                 const rotationThisFrame = degreesPerSecond * (deltaTime / 1000);
                 state.animRotation = (state.animRotation - (rotationThisFrame * state.rotDirection));
