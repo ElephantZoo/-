@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">    
-    <title>费纳奇镜动画绘制工具 免费在线专业手绘动画制作工具|Phenakistiscope animation drawing tool</title>
+    <title>费纳奇镜动画绘制工具 免费在线创作|Phenakistiscope animation drawing tool</title>
     <meta name="description" content="费纳奇镜动画绘制工具，免费在线无需下载，适配PC/iPad，轻松手绘制作费纳奇镜动画，极致流畅的触屏绘画体验，专业动画爱好者必备工具。">
     <meta name="keywords" content="费纳奇镜,费纳奇镜制作,费纳奇镜动画,动画绘制工具,在线动画制作,手绘动画工具,iPad动画制作,免费动画工具,触屏动画绘制,Phenakistiscope,Phenakistiscope maker,online animation tool,iPad touch drawing,animation creator">
     <meta name="robots" content="index,follow">
@@ -55,8 +55,17 @@
     }
     .viewport.panning { cursor: grab !important; }
     .viewport.panning:active { cursor: grabbing !important; }
-    .viewport.rotating { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path fill='%23fff' d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z'/></svg>"), grab !important; }
+    
+    /* 
+       修复逻辑：将 erasing 放在 rotating 前面。
+       CSS 优先级规则：同等权重下，后定义的覆盖先定义的。
+       这样当同时拥有 erasing 和 rotating 类时(橡皮擦模式下按R)，rotating 的光标会生效。
+    */
     .viewport.erasing { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' stroke='%23e74c3c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2'/></svg>") 12 12, auto !important; }
+
+    /* 修改了 rotating 的 SVG 图标，换成了循环箭头 */
+    .viewport.rotating { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23fff' stroke='%23000' stroke-width='0.5'><path d='M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z'/></svg>") 12 12, grab !important; }
+    
     #mainCanvas { display: block; width: 100%; height: 100%; touch-action: none; }
     .save-indicator { position: absolute; top: 10px; left: 10px; z-index: 100; font-size: 12px; opacity: 0.8; pointer-events: none; display: flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 20px; }
     .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
@@ -136,6 +145,7 @@
         transition: width 0.2s, right 0.2s, left 0.2s;
         display: flex; flex-direction: column; gap: 5px;
         pointer-events: auto;
+        cursor: default;
     }
     .shortcut-header { 
         display: flex; justify-content: space-between; align-items: center; 
@@ -189,7 +199,6 @@
         display: flex; flex-direction: column; gap: 10px;
         color: #ddd; font-size: 12px;
         animation: popIn 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-        /* 移除默认的 top/right/left，完全由JS动态计算 */
     }
     
     @keyframes popIn {
@@ -304,9 +313,12 @@
                 <span id="fpsVal" style="font-size:11px; width:20px;">12</span>
                 <button id="rotateDirBtn" class="dir-btn" title="切换旋转方向">↺ 反向</button>
             </div>
-            <div class="row">
+            <div class="row" style="display:block;">
+                <button id="touchDrawToggleBtn" class="small-btn active" style="width:100%;">🤚 手指绘画: 开</button>
+                <div style="font-size:10px; color:#666; margin-top:3px; text-align:center;">(触控端生效)</div>
+            </div>
+            <div class="row" style="margin-top:8px;">
                 <button id="layoutToggleBtn" class="small-btn">⇋ 切换左/右布局</button>
-                <button id="touchDrawToggleBtn" class="small-btn active">🤚 手指绘画: 开</button>
             </div>
         </div>
         <div class="panel-section">
@@ -381,16 +393,16 @@
                 <span id="onionOpacityVal" style="font-size:11px; width:28px;">0.5</span>
             </div>
             <div class="row">
-                <button id="onionLayerBtn" class="small-btn" title="切换洋葱皮显示在画面最上层/最下层">洋葱皮 ▲ 置顶</button>
+                <button id="onionLayerBtn" class="small-btn" title="切换洋葱皮显示在画面最上层/最下层">洋葱皮 ▼ 置底</button>
             </div>
-            <div class="row" style="justify-content: space-between;">
-                <span style="font-size:12px">扇形数:</span>
-                <div style="display:flex; align-items:center; background:#222; border-radius:3px; padding:2px;">
-                    <button id="sliceDecBtn" class="small-btn" style="width:30px; margin:0;">-</button>
-                    <span id="sliceValDisplay" style="width:30px; text-align:center; font-size:12px;">12</span>
-                    <button id="sliceIncBtn" class="small-btn" style="width:30px; margin:0;">+</button>
-                </div>
+            
+            <!-- 扇形数修改：改为滑块 -->
+            <div class="row">
+                <span style="font-size:12px; flex-shrink:0;">扇形数:</span>
+                <input type="range" id="sliceCountRange" min="4" max="24" step="1" value="12">
+                <span id="sliceValDisplay" style="width:20px; font-size:12px; text-align:center;">12</span>
             </div>
+
             <div class="btn-group-full">
                 <button id="exportJsonBtn" class="json-btn">导出项目(ZIP)</button>
             </div>
@@ -423,7 +435,7 @@
         draggedLayerId: null,
         dragStartAngle: 0, dragStartViewRot: 0, cursorWorldX: 0, cursorWorldY: 0, cursorScreenX: 0, cursorScreenY: 0, isCursorInCanvas: false,
         onionSkins: { enabled: true, showBefore: true, showAfter: true, opacity: 0.5 },
-        onionOnTop: true,
+        onionOnTop: false,
         snapToMidline: true, hasUnsavedChanges: false, dpr: 1, fps: 12,
         isGesturing: false,
         allowTouchDraw: true
@@ -432,16 +444,15 @@
     const DOM = {};
     let undoStack = [], redoStack = [];
     
-    // 颜色选择器状态
     const cpState = {
         h: 0, s: 0, v: 100,
         isDraggingSV: false,
         isDraggingHue: false,
-        targetCallback: null // 回调函数，用于更新颜色
+        targetCallback: null
     };
 
     function init() {
-        const ids = [ "viewport", "mainCanvas", "importJsonInput", "onionToggle", "onionOpacity", "onionOpacityVal", "fpsRange", "fpsVal", "rotationSlider", "currentLayerInput", "layerList", "brushSizeLabel", "brushSize", "brushSizeVal", "statusDot", "statusText", "playBtn", "playbackModeBtn", "snapToggle", "layerOpacity", "layerOpacityVal", "modeFillBtn", "modeStrokeBtn", "toolEraserBtn", "undoBtn", "redoBtn", "addLayerBtn", "delLayerBtn", "clearLayerBtn", "resetViewBtn", "exportJsonBtn", "resetAllBtn", "rotateDirBtn", "onionLayerBtn", "projectNameInput", "copyLayerBtn", "onionBeforeToggle", "onionAfterToggle", "welcomeModal", "closeModalBtn", "layoutToggleBtn", "rotLeftBtn", "rotRightBtn", "sliceDecBtn", "sliceIncBtn", "sliceValDisplay", "shortcutPanel", "shortcutContent", "shortcutToggleBtn", "shortcutTitle", "touchDrawToggleBtn", "rotControl", "toastMsg", 
+        const ids = [ "viewport", "mainCanvas", "importJsonInput", "onionToggle", "onionOpacity", "onionOpacityVal", "fpsRange", "fpsVal", "rotationSlider", "currentLayerInput", "layerList", "brushSizeLabel", "brushSize", "brushSizeVal", "statusDot", "statusText", "playBtn", "playbackModeBtn", "snapToggle", "layerOpacity", "layerOpacityVal", "modeFillBtn", "modeStrokeBtn", "toolEraserBtn", "undoBtn", "redoBtn", "addLayerBtn", "delLayerBtn", "clearLayerBtn", "resetViewBtn", "exportJsonBtn", "resetAllBtn", "rotateDirBtn", "onionLayerBtn", "projectNameInput", "copyLayerBtn", "onionBeforeToggle", "onionAfterToggle", "welcomeModal", "closeModalBtn", "layoutToggleBtn", "rotLeftBtn", "rotRightBtn", "sliceCountRange", "sliceValDisplay", "shortcutPanel", "shortcutContent", "shortcutToggleBtn", "shortcutTitle", "touchDrawToggleBtn", "rotControl", "toastMsg", 
             "layerColorTrigger", "layerColorSwatch", "backgroundColorTrigger", "bgColorSwatch", 
             "colorPickerOverlay", "colorPickerBox", "cpSatValCanvas", "cpHueCanvas", "cpSVPointer", "cpHueSlider", "cpPreview", "cpHexInput", "cpOkBtn", "cpSVWrap", "cpHueWrap"
         ];
@@ -449,21 +460,7 @@
         DOM.ctx = DOM.mainCanvas.getContext('2d');
         state.dpr = window.devicePixelRatio || 1;
         
-        // 全局自动失焦
-        document.addEventListener('click', (e) => {
-            const t = e.target;
-            if (t.tagName === 'BUTTON' || t.closest('button')) {
-                (t.tagName === 'BUTTON' ? t : t.closest('button')).blur();
-            }
-            if (t.tagName === 'INPUT' && t.type === 'checkbox') t.blur();
-        }, true);
-        
-        document.querySelectorAll('input[type="range"]').forEach(el => {
-            el.addEventListener('pointerup', () => el.blur());
-            el.addEventListener('touchend', () => el.blur());
-            el.addEventListener('change', () => el.blur());
-        });
-        
+        initGlobalAutoBlur();
         window.lastPencilTime = 0;
 
         const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -471,14 +468,33 @@
 
         initShortcutPanel(); 
         initRotationKnob(); 
-        initColorPicker(); // 初始化自定义取色器
+        initColorPicker();
         
         resizeCanvas(); centerView(); addLayer("图层 1");
         new ResizeObserver(() => { resizeCanvas(); render(); }).observe(DOM.viewport);
         bindEvents(); updateUI(); saveHistory(); requestAnimationFrame(loop);
     }
+
+    function initGlobalAutoBlur() {
+        const handleBlur = (e) => {
+            const t = e.target;
+            if (t.tagName === 'INPUT' && (t.type === 'text' || t.type === 'number')) {
+                return;
+            }
+            if (t && t.blur) {
+                setTimeout(() => t.blur(), 0);
+            }
+        };
+        window.addEventListener('mouseup', handleBlur);
+        window.addEventListener('touchend', handleBlur);
+        window.addEventListener('change', handleBlur);
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+                e.target.blur();
+            }
+        });
+    }
     
-    // --- 颜色转换辅助函数 ---
     function hsvToRgb(h, s, v) {
         s /= 100; v /= 100;
         let c = v * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c, r = 0, g = 0, b = 0;
@@ -511,9 +527,7 @@
         return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
     }
 
-    // --- 颜色选择器逻辑 ---
     function initColorPicker() {
-        // 渲染色相条
         const hueCtx = DOM.cpHueCanvas.getContext('2d');
         const hueGrad = hueCtx.createLinearGradient(0, 0, 0, 200);
         hueGrad.addColorStop(0, "red");
@@ -526,7 +540,6 @@
         hueCtx.fillStyle = hueGrad;
         hueCtx.fillRect(0, 0, 30, 200);
 
-        // 事件绑定
         DOM.cpSVWrap.addEventListener('pointerdown', startDragSV);
         DOM.cpSVWrap.addEventListener('pointermove', dragSV);
         DOM.cpSVWrap.addEventListener('pointerup', endDrag);
@@ -548,7 +561,6 @@
         });
     }
 
-    // 处理点击外部关闭的逻辑
     function handleOutsideClick(e) {
         const box = DOM.colorPickerBox;
         const target = e.target;
@@ -563,19 +575,16 @@
         const h = ctx.canvas.height;
         ctx.clearRect(0, 0, w, h);
         
-        // 1. 底色：当前色相
         const svBaseColor = hsvToRgb(cpState.h, 100, 100);
         ctx.fillStyle = `rgb(${svBaseColor.r},${svBaseColor.g},${svBaseColor.b})`;
         ctx.fillRect(0, 0, w, h);
         
-        // 2. 水平渐变：白色 -> 透明
         const grH = ctx.createLinearGradient(0, 0, w, 0);
         grH.addColorStop(0, "#fff");
         grH.addColorStop(1, "rgba(255,255,255,0)");
         ctx.fillStyle = grH;
         ctx.fillRect(0, 0, w, h);
         
-        // 3. 垂直渐变：透明 -> 黑色
         const grV = ctx.createLinearGradient(0, 0, 0, h);
         grV.addColorStop(0, "rgba(0,0,0,0)");
         grV.addColorStop(1, "#000");
@@ -602,7 +611,6 @@
         DOM.cpHexInput.value = hex;
     }
 
-    // 智能定位开启函数
     function openColorPicker(initialHex, callback, triggerEl) {
         cpState.targetCallback = callback;
         const rgb = hexToRgb(initialHex) || {r:255, g:0, b:0};
@@ -612,19 +620,16 @@
         updateColorPickerUI();
         DOM.colorPickerOverlay.style.display = 'block';
         
-        // --- 核心改动：智能计算位置，不挡住按钮 ---
         if (triggerEl) {
             const rect = triggerEl.getBoundingClientRect();
             const box = DOM.colorPickerBox;
             const isLeftLayout = document.body.classList.contains('layout-left');
-            const gap = 12; // 间距
+            const gap = 12;
             
-            // 默认清空旧样式
             box.style.top = ''; box.style.left = ''; box.style.right = ''; box.style.bottom = '';
             
-            // 垂直位置：尽量和按钮顶部对齐，但防止超出屏幕下边缘
             let topPos = rect.top - 10;
-            const boxHeight = 290; // 预估高度
+            const boxHeight = 290;
             if (topPos + boxHeight > window.innerHeight) {
                 topPos = window.innerHeight - boxHeight - 20;
             }
@@ -632,15 +637,9 @@
             box.style.top = topPos + 'px';
 
             if (isLeftLayout) {
-                // 侧边栏在左，Picker 显示在按钮右侧
                 box.style.left = (rect.right + gap) + 'px';
                 box.style.right = 'auto';
             } else {
-                // 侧边栏在右（默认），Picker 显示在按钮左侧
-                // 注意：使用 right 属性相对于视口右侧定位可能更稳，或者算 left
-                // 这里我们算 left，按钮左边 - 盒子宽度 - 间距
-                // 由于 CSS 中 box width 是 260px (padding 15*2 = 290 total width approx)
-                // 我们可以直接用 right 属性简单点： windowWidth - rect.left + gap
                 box.style.left = 'auto';
                 box.style.right = (window.innerWidth - rect.left + gap) + 'px';
             }
@@ -712,7 +711,6 @@
         e.target.releasePointerCapture(e.pointerId);
     }
 
-    // Toast 提示函数
     function showToast(msg) {
         DOM.toastMsg.innerText = msg;
         DOM.toastMsg.classList.add('show');
@@ -722,7 +720,6 @@
         }, 1000);
     }
     
-    // 初始化右上角旋钮逻辑
     function initRotationKnob() {
         const knob = DOM.rotControl;
         let isKnobRotating = false;
@@ -854,7 +851,14 @@
         ctx.restore();
     }
     
-    function setupTransform(ctx) { ctx.translate(state.panX, state.panY); ctx.scale(state.zoom, state.zoom); const cx = CONFIG.baseSize / 2, cy = CONFIG.baseSize / 2; ctx.translate(cx, cy); ctx.rotate(state.viewRotation * Math.PI / 180); if (state.isPlaying) ctx.rotate(state.animRotation * Math.PI / 180); ctx.translate(-cx, -cy); }
+    function setupTransform(ctx) { 
+        ctx.translate(state.panX, state.panY); 
+        ctx.scale(state.zoom, state.zoom); 
+        const cx = CONFIG.baseSize / 2, cy = CONFIG.baseSize / 2; 
+        ctx.translate(cx, cy); 
+        ctx.rotate((state.viewRotation - 90) * Math.PI / 180);
+         if (state.isPlaying) ctx.rotate(state.animRotation * Math.PI / 180);
+          ctx.translate(-cx, -cy); }
     
     function renderLayer(ctx, layer) {
         ctx.save();
@@ -876,47 +880,57 @@
     }
 
     function renderOnionSkins(ctx) {
-        const activeLayer = getActiveLayer(); if (!activeLayer || activeLayer.paths.length === 0) return;
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = CONFIG.baseSize; tempCanvas.height = CONFIG.baseSize;
-        const tempCtx = tempCanvas.getContext('2d');
-        renderLayer(tempCtx, { ...activeLayer, opacity: 1 });
+        const activeLayer = getActiveLayer(); 
+        if (!activeLayer || activeLayer.paths.length === 0) return;
 
         const step = 360 / state.sliceCount * Math.PI / 180;
-        const drawTintedFrame = (rotation, color) => {
-            const tintedCanvas = document.createElement('canvas');
-            tintedCanvas.width = CONFIG.baseSize; tintedCanvas.height = CONFIG.baseSize;
-            const tintedCtx = tintedCanvas.getContext('2d');
-            tintedCtx.drawImage(tempCanvas, 0, 0);
-            tintedCtx.globalCompositeOperation = 'source-in';
-            tintedCtx.fillStyle = color;
-            tintedCtx.fillRect(0, 0, CONFIG.baseSize, CONFIG.baseSize);
 
+        const drawVectorOnion = (rotation, color) => {
             ctx.save();
             ctx.globalAlpha = state.onionSkins.opacity;
             ctx.translate(CONFIG.baseSize/2, CONFIG.baseSize/2);
             ctx.rotate(rotation);
             ctx.translate(-CONFIG.baseSize/2, -CONFIG.baseSize/2);
-            ctx.drawImage(tintedCanvas, 0, 0);
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = activeLayer.strokeWidth;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            activeLayer.paths.forEach(path => {
+                if (path.points.length < 1) return;
+                ctx.beginPath();
+                ctx.moveTo(path.points[0].x, path.points[0].y);
+                for (let i = 1; i < path.points.length; i++) {
+                    ctx.lineTo(path.points[i].x, path.points[i].y);
+                }
+                if (activeLayer.mode === 'fill') { 
+                    if (path.points.length > 1) ctx.closePath(); 
+                    ctx.fill(); 
+                } else { 
+                    ctx.stroke(); 
+                }
+            });
             ctx.restore();
         };
-        if (state.onionSkins.showBefore) drawTintedFrame(-step * state.rotDirection, 'rgba(255, 0, 0, 0.7)');
-        if (state.onionSkins.showAfter) drawTintedFrame(step * state.rotDirection, 'rgba(0, 0, 255, 0.7)');
+
+        if (state.onionSkins.showBefore) {
+            drawVectorOnion(-step * state.rotDirection, '#ff0000');
+        }
+        if (state.onionSkins.showAfter) {
+            drawVectorOnion(step * state.rotDirection, '#0000ff');
+        }
     }
 
     function updateUI() {
         DOM.projectNameInput.value = state.projectName;
         const activeLayer = getActiveLayer(); const hasLayers = activeLayer !== null;
         DOM.currentLayerInput.disabled = !hasLayers; 
-        // DOM.layerColorInput.disabled = !hasLayers; // Removed old input control
         DOM.modeFillBtn.disabled = !hasLayers; DOM.modeStrokeBtn.disabled = !hasLayers;
         DOM.toolEraserBtn.disabled = !hasLayers; DOM.brushSize.disabled = !hasLayers;
         DOM.layerOpacity.disabled = !hasLayers; DOM.delLayerBtn.disabled = state.layers.length <= 1;
         if (hasLayers) {
             DOM.currentLayerInput.value = activeLayer.name; 
-            // Update color swatch
             DOM.layerColorSwatch.style.backgroundColor = activeLayer.color;
-            
             DOM.modeFillBtn.classList.toggle('active', state.currentTool === 'brush' && activeLayer.mode === 'fill');
             DOM.modeStrokeBtn.classList.toggle('active', state.currentTool === 'brush' && activeLayer.mode === 'stroke');
             DOM.toolEraserBtn.classList.toggle('active', state.currentTool === 'eraser');
@@ -925,7 +939,6 @@
         } else { DOM.currentLayerInput.value = "无图层"; }
         DOM.undoBtn.disabled = undoStack.length <= 1; DOM.redoBtn.disabled = redoStack.length === 0;
         
-        // Update bg swatch
         DOM.bgColorSwatch.style.backgroundColor = state.backgroundColor;
         
         DOM.onionLayerBtn.textContent = state.onionOnTop ? '洋葱皮 ▲ 置顶' : '洋葱皮 ▼ 置底';
@@ -937,7 +950,11 @@
         document.querySelector('label[for="onionAfterToggle"]').classList.toggle('active', state.onionSkins.showAfter && state.onionSkins.enabled);
         DOM.onionOpacityVal.textContent = state.onionSkins.opacity.toFixed(2);
         DOM.onionOpacity.value = state.onionSkins.opacity;
+        
+        // 更新扇形数滑块显示
+        DOM.sliceCountRange.value = state.sliceCount;
         DOM.sliceValDisplay.textContent = state.sliceCount;
+
         DOM.touchDrawToggleBtn.textContent = state.allowTouchDraw ? "🤚 手指绘画: 开" : "🚫 手指绘画: 关";
         DOM.touchDrawToggleBtn.classList.toggle('active', state.allowTouchDraw);
         if(!state.allowTouchDraw) DOM.touchDrawToggleBtn.style.background = 'var(--danger-color)';
@@ -1040,7 +1057,7 @@
             if (filename) finalProjectName = filename.replace(/\.(json|zip)$/i, '');
             if (data.state.projectName) finalProjectName = data.state.projectName;
             if (data.state.onionEnabled !== undefined) { data.state.onionSkins = { enabled: data.state.onionEnabled, opacity: data.state.onionOpacity || 0.5, showBefore: true, showAfter: true }; delete data.state.onionEnabled; delete data.state.onionOpacity; }
-            const persistentState = { projectName: finalProjectName, layers: data.state.layers, activeLayerIndex: data.state.activeLayerIndex, sliceCount: data.state.sliceCount, rotDirection: data.state.rotDirection, backgroundColor: data.state.backgroundColor || '#ffffff', zoom: data.state.zoom, panX: data.state.panX, panY: data.state.panY, viewRotation: data.state.viewRotation, onionSkins: data.state.onionSkins, onionOnTop: data.state.onionOnTop || true, snapToMidline: data.state.snapToMidline, fps: data.state.fps, playbackMode: data.state.playbackMode || 'slice' };
+            const persistentState = { projectName: finalProjectName, layers: data.state.layers, activeLayerIndex: data.state.activeLayerIndex, sliceCount: data.state.sliceCount, rotDirection: data.state.rotDirection, backgroundColor: data.state.backgroundColor || '#ffffff', zoom: data.state.zoom, panX: data.state.panX, panY: data.state.panY, viewRotation: data.state.viewRotation, onionSkins: data.state.onionSkins, onionOnTop: data.state.onionOnTop || false, snapToMidline: data.state.snapToMidline, fps: data.state.fps, playbackMode: data.state.playbackMode || 'slice' };
             Object.assign(state, persistentState);
             resetInteractionState(); setActiveLayer(state.activeLayerIndex);
             undoStack = []; redoStack = []; saveHistory(); setUnsaved(false);
@@ -1057,15 +1074,17 @@
     }
 
     function bindEvents() {
-        // --- Pointer Events (绘画与单指操作) ---
         
         DOM.viewport.addEventListener('pointerdown', e => { 
+            if (document.activeElement instanceof HTMLInputElement) {
+                document.activeElement.blur();
+            }
+
             if (state.isGesturing) return; 
             if (e.pointerType === 'touch' && !e.isPrimary) return; 
 
-            // 1. Pencil: 始终绘画，优先级最高
             if (e.pointerType === 'pen') {
-                window.lastPencilTime = Date.now(); // 更新 Pencil 活跃时间
+                window.lastPencilTime = Date.now(); 
                 e.preventDefault();
                 DOM.viewport.setPointerCapture(e.pointerId); 
                 state.isCursorInCanvas = true;
@@ -1083,7 +1102,6 @@
 
             e.preventDefault();
 
-            // 2. 正常绘画/平移逻辑
             DOM.viewport.setPointerCapture(e.pointerId); 
             state.isCursorInCanvas = true; 
 
@@ -1104,7 +1122,6 @@
                 const pathToErase = findClosestPath(pos); 
                 if (pathToErase) state.pathsToErase.add(pathToErase.id); 
             } else if (state.currentTool === 'brush') { 
-                // 只有允许手指绘画才画
                 if (!e.pointerType.includes('touch') || state.allowTouchDraw) {
                     state.isDrawing = true; 
                     state.currentBrushPath = [pos]; 
@@ -1191,7 +1208,6 @@
         });
         DOM.viewport.addEventListener('pointerenter', () => { state.isCursorInCanvas = true; });
 
-        // --- Touch Events ---
         let startTouches = [];
         let startPan = { x: 0, y: 0 };
         let startZoom = 1;
@@ -1204,7 +1220,7 @@
         let maxTouches = 0;
         let touchTotalMovement = 0; 
         
-        let singleSwipeStartY = 0; // 单指滑动的起始Y
+        let singleSwipeStartY = 0; 
         const ROTATION_THRESHOLD = 15;
 
         DOM.viewport.addEventListener('touchstart', e => {
@@ -1293,23 +1309,18 @@
                 
                 const duration = Date.now() - touchStartTime;
                 
-                // 1. 点击判断：位移极小且时间短
                 if (duration < 300 && touchTotalMovement < 10) { 
                     if (maxTouches === 2) undo(); 
                     else if (maxTouches === 3) redo(); 
                 }
                 
-                // 2. 核心修正：单指滑动切帧 (仅限：单指 + 禁止绘画模式 + Pencil不活跃)
-                // 增加检测：如果最近 500ms 内有 Pencil 活动，则禁止切帧（防止手掌误触）
                 const isPencilActive = (Date.now() - (window.lastPencilTime || 0) < 500);
 
                 if (maxTouches === 1 && !state.allowTouchDraw && !isPencilActive && duration < 250 && touchTotalMovement > 30) {
                     const endY = e.changedTouches[0].clientY;
                     const deltaY = endY - singleSwipeStartY;
                     if (Math.abs(deltaY) > 30) {
-                        // 下滑 -> 正向(右键) -> 顺时针
                         if (deltaY > 0) rotateView(-1); 
-                        // 上滑 -> 反向(左键) -> 逆时针
                         else rotateView(1); 
                     }
                 }
@@ -1318,7 +1329,6 @@
             }
         });
 
-        // 按钮事件绑定
         function startDrag(e) { state.drag.isActive = true; state.drag.startX = e.clientX; state.drag.startY = e.clientY; state.drag.startPanX = state.panX; state.drag.startPanY = state.panY; }
         function doDrag(e) { if (!state.drag.isActive) return; state.panX = state.drag.startPanX + (e.clientX - state.drag.startX); state.panY = state.drag.startPanY + (e.clientY - state.drag.startY); render(); }
         DOM.viewport.addEventListener('wheel', e => { e.preventDefault(); if (e.shiftKey) { rotateView(e.deltaY > 0 ? -0.2 : 0.2); } else { const rect = DOM.mainCanvas.getBoundingClientRect(); const mx = e.clientX - rect.left, my = e.clientY - rect.top; const zoomFactor = 1.1; let newZoom = state.zoom * (e.deltaY < 0 ? zoomFactor : 1 / zoomFactor); newZoom = Math.max(0.1, Math.min(newZoom, 10)); const offsetX = (mx - state.panX), offsetY = (my - state.panY); state.panX = mx - (offsetX * (newZoom / state.zoom)); state.panY = my - (offsetY * (newZoom / state.zoom)); state.zoom = newZoom; } render(); }, { passive: false });
@@ -1337,7 +1347,19 @@
         window.addEventListener('blur', () => { state.isPanning = false; DOM.viewport.classList.remove('panning', 'rotating'); resetInteractionState(); });
         window.addEventListener('beforeunload', (e) => { if (state.hasUnsavedChanges) { e.preventDefault(); e.returnValue = ''; } });
 
-        DOM.projectNameInput.onchange = e => { state.projectName = e.target.value.trim() || '未命名项目'; setUnsaved(true); updateUI(); };
+        DOM.projectNameInput.oninput = e => { state.projectName = e.target.value.trim() || '未命名项目'; setUnsaved(true); };
+        
+        DOM.currentLayerInput.oninput = e => {
+            const layer = getActiveLayer();
+            if (layer) {
+                layer.name = e.target.value;
+                renderLayerList(); 
+            }
+        };
+        DOM.currentLayerInput.onchange = e => {
+            saveHistory(); 
+        };
+
         DOM.addLayerBtn.onclick = () => addLayer();
         DOM.delLayerBtn.onclick = deleteLayer;
         DOM.copyLayerBtn.onclick = duplicateLayer;
@@ -1345,15 +1367,12 @@
         DOM.undoBtn.onclick = undo;
         DOM.redoBtn.onclick = redo;
         DOM.resetViewBtn.onclick = centerView;
-        DOM.currentLayerInput.onchange = e => changeActiveLayerProperty('name', e.target.value);
-        // DOM.layerColorInput.oninput = e => changeActiveLayerProperty('color', e.target.value);
+        
         DOM.brushSize.oninput = e => { const layer = getActiveLayer(); if (layer) { layer.strokeWidth = e.target.value; updateUI(); render(); } };
         DOM.brushSize.onchange = () => saveHistory();
         DOM.layerOpacity.oninput = e => { const layer = getActiveLayer(); if (layer) { layer.opacity = parseFloat(e.target.value); updateUI(); render(); } };
         DOM.layerOpacity.onchange = () => saveHistory();
-        // DOM.backgroundColorInput.oninput = e => { state.backgroundColor = e.target.value; updateUI(); render(); };
         
-        // 自定义取色器触发 - 修复：传入 this 
         DOM.layerColorTrigger.onclick = function() {
             const layer = getActiveLayer();
             if(layer) openColorPicker(layer.color, (hex) => {
@@ -1402,8 +1421,12 @@
         DOM.onionOpacity.oninput = e => { state.onionSkins.opacity = parseFloat(e.target.value); updateUI(); render(); };
         DOM.snapToggle.onchange = e => { state.snapToMidline = e.target.checked; if (state.snapToMidline) { snapRotation(); render(); } };
         
-        DOM.sliceDecBtn.onclick = () => { state.sliceCount = Math.max(4, state.sliceCount - 1); updateUI(); render(); };
-        DOM.sliceIncBtn.onclick = () => { state.sliceCount = Math.min(24, state.sliceCount + 1); updateUI(); render(); };
+        // 扇形数改为滑块事件绑定
+        DOM.sliceCountRange.oninput = e => { 
+            state.sliceCount = parseInt(e.target.value); 
+            DOM.sliceValDisplay.textContent = state.sliceCount;
+            render(); 
+        };
         
         DOM.rotationSlider.oninput = e => { state.viewRotation = parseFloat(e.target.value); render(); };
         DOM.rotationSlider.onchange = () => { if (state.snapToMidline) { snapRotation(); render(); } };
@@ -1447,7 +1470,8 @@
             } catch (error) { console.error("导出 ZIP 失败:", error); alert("导出失败，请打开开发者控制台查看错误信息。"); } finally { DOM.exportJsonBtn.textContent = originalButtonText; DOM.exportJsonBtn.disabled = false; }
         };
         DOM.importJsonInput.onchange = async (e) => {
-            e.target.blur()
+            e.target.blur(); 
+            
             if (!e.target.files.length) return;
             const file = e.target.files[0];
             e.target.value = '';
@@ -1475,7 +1499,7 @@
         const cx = CONFIG.baseSize / 2, cy = CONFIG.baseSize / 2;
         const dx = worldX - cx, dy = worldY - cy;
         const dynamicRotation = state.isPlaying ? state.animRotation : 0;
-        const rad = -(state.viewRotation + dynamicRotation) * Math.PI / 180;
+        const rad = -(state.viewRotation - 90 + dynamicRotation) * Math.PI / 180;
         const finalX = dx * Math.cos(rad) - dy * Math.sin(rad) + cx;
         const finalY = dx * Math.sin(rad) + dy * Math.cos(rad) + cy;
         return { x: finalX, y: finalY };
@@ -1537,7 +1561,7 @@
         ctx.strokeStyle = 'rgba(255,50,50,0.5)'; 
         ctx.lineWidth = 2/z; 
         ctx.moveTo(cx, cy); 
-        ctx.lineTo(cx, cy - r); 
+        ctx.lineTo(cx + r, cy);  
         ctx.stroke(); 
     }
 
