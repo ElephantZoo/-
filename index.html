@@ -2,14 +2,11 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">    
-    <title>费纳奇镜动画绘制工具 免费在线动画制作 |Phenakistiscope Animation Drawing Tool </title>
-    <meta name="description" content="费纳奇镜动画绘制工具，免费在线无需下载，专业适配PC/iPad，轻松手绘制作费纳奇镜动画，极致流畅的触屏绘画体验，专业动画爱好者必备工具。">
-    <meta name="keywords" content="费纳奇镜,费纳奇镜制作,费纳奇镜动画,费纳奇镜在线,动画绘制工具,在线动画制作,手绘动画工具,iPad动画制作,免费动画工具,触屏动画绘制,Phenakistiscope,Phenakistiscope maker,online animation tool,iPad touch drawing,animation creator">
-    <meta name="robots" content="index,follow">
+    <title>费纳奇镜动画绘制工具 v12.25 (智能定位调色版)</title>
+    <meta name="description" content="免费在线费纳奇镜动画绘制工具，内置专业sRGB颜色选择器，iPad手势优化。">
+    <meta name="robots" content="index, follow, all">
     <meta name="author" content="Elephantzoo">
-    <meta name="copyright" content="Copyright © Elephantzoo All Rights Reserved. 版权所有">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -106,12 +103,16 @@
     input[type="checkbox"] { outline: none !important; }
     input[type="text"] { flex:1; background:#333; border:1px solid #555; color:#fff; font-size:12px; padding:2px 4px; border-radius:2px; outline:none; text-align: left; min-width: 100px; }
     input[type="file"], input[type="checkbox"].visually-hidden { opacity:0; width:0; height:0; position:absolute; }
-    .color-input-wrapper { width: 24px; height: 24px; border: none; background: none; padding: 0; cursor: pointer; border-radius: 4px; overflow: hidden; }
-    input[type="color"] { -webkit-appearance: none; -moz-appearance: none; appearance: none; width: 32px; height: 32px; background-color: transparent; border: none; cursor: pointer; position: relative; top: -4px; left: -4px; outline: none; }
-    input[type="color"]::-webkit-color-swatch { border-radius: 4px; border: 2px solid #555; }
-    input[type="color"]::-moz-color-swatch { border-radius: 4px; border: 2px solid #555; }
 
-    /* Layer List */
+    /* Swatches */
+    .color-swatch-wrapper { 
+        width: 24px; height: 24px; border-radius: 4px; overflow: hidden; 
+        cursor: pointer; border: 1px solid #555; flex-shrink: 0; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .color-swatch { width: 100%; height: 100%; background: #fff; }
+
+    /* Layer List & Items */
     .layer-list { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; background: #222; border-radius: 4px; padding: 4px; }
     .layer-item { display: flex; align-items: center; gap: 8px; padding: 6px; background: #333; color: #aaa; cursor: grab; border: 1px solid transparent; border-radius: 3px; transition: background-color 0.1s; }
     .layer-item.active { background: #444; color: #fff; border-color: var(--accent-color); }
@@ -119,16 +120,16 @@
     .layer-item.dragging { opacity: 0.4; }
     .layer-vis { cursor: pointer; width: 20px; text-align: center; }
     .layer-name { flex: 1; font-size: 12px; user-select: none; }
+    .layer-move-btn { padding: 0 4px; width: auto; min-width: 20px; font-size: 10px; line-height: 1.5; background: transparent; color: #666; flex: 0 0 auto; }
+    .layer-move-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
 
     /* Shortcut Panel */
     .shortcut-panel { 
-        position: absolute; 
-        bottom: calc(20px + env(safe-area-inset-bottom)); 
+        position: absolute; bottom: calc(20px + env(safe-area-inset-bottom)); 
         left: 10px; right: 10px; 
         background: rgba(0,0,0,0.9); padding: 8px 15px; border-radius: 6px; 
         font-size: 12px; color: #ccc; 
-        border: 1px solid #555; 
-        z-index: 2000; 
+        border: 1px solid #555; z-index: 2000; 
         transition: width 0.2s, right 0.2s, left 0.2s;
         display: flex; flex-direction: column; gap: 5px;
         pointer-events: auto;
@@ -142,19 +143,87 @@
     .shortcut-content { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
     .shortcut-content span { display: inline-block; }
     .shortcut-content strong { color: var(--accent-color); font-weight: normal; padding: 0 2px; }
-    
-    /* Collapsed State */
     .shortcut-panel.collapsed .shortcut-content { display: none; }
     .shortcut-panel.collapsed { width: 140px; left: auto; right: 10px; }
 
+    /* Constant Rotation Knob */
+    .rotation-control {
+        position: absolute; top: 50px; right: 15px; 
+        width: 60px; height: 60px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 50%;
+        cursor: grab; z-index: 150;
+        backdrop-filter: blur(2px);
+        touch-action: none;
+    }
+    .rotation-control::before {
+        content: ''; position: absolute; top: 0; left: 50%;
+        width: 2px; height: 50%; background: var(--accent-color);
+        transform-origin: bottom center; transform: translateX(-50%);
+    }
+    .rotation-control:active { border-color: var(--accent-color); background: rgba(0, 0, 0, 0.7); cursor: grabbing; }
+
+    /* Toast Notification */
+    .toast-message {
+        position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%);
+        background: rgba(0,0,0,0.8); color: white; padding: 8px 16px; border-radius: 20px;
+        font-size: 14px; pointer-events: none; opacity: 0; transition: opacity 0.3s;
+        z-index: 5000; border: 1px solid #444; backdrop-filter: blur(4px);
+    }
+    .toast-message.show { opacity: 1; }
+
+    /* ====== 悬浮颜色选择器样式 ====== */
+    #colorPickerOverlay { display: none; }
+
+    .color-picker-box {
+        position: fixed; /* 固定定位 */
+        z-index: 5000;
+        background: rgba(37, 37, 37, 0.98); 
+        border: 1px solid #666; border-radius: 8px;
+        padding: 15px; width: 260px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        display: flex; flex-direction: column; gap: 10px;
+        color: #ddd; font-size: 12px;
+        animation: popIn 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        /* 移除默认的 top/right/left，完全由JS动态计算 */
+    }
+    
+    @keyframes popIn {
+        from { transform: scale(0.9); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    .cp-row { display: flex; gap: 10px; }
+    .cp-canvas-wrap { position: relative; width: 190px; height: 190px; cursor: crosshair; touch-action: none; }
+    .cp-hue-wrap { position: relative; width: 25px; height: 190px; cursor: pointer; touch-action: none; }
+    #cpSatValCanvas { border-radius: 4px; border: 1px solid #000; width: 100%; height: 100%; }
+    #cpHueCanvas { border-radius: 4px; border: 1px solid #000; width: 100%; height: 100%; }
+    .cp-pointer {
+        position: absolute; width: 10px; height: 10px; border: 2px solid #fff;
+        border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none;
+        box-shadow: 0 0 2px #000;
+    }
+    .cp-hue-slider {
+        position: absolute; left: -2px; width: 100%; height: 6px;
+        border: 2px solid #fff; box-shadow: 0 0 2px #000;
+        border-radius: 2px; transform: translateY(-50%); pointer-events: none;
+        box-sizing: content-box;
+    }
+    .cp-preview { width: 40px; height: 24px; border: 1px solid #444; border-radius: 4px; }
+    .cp-input { flex: 1; background: #333; border: 1px solid #555; color: #fff; padding: 4px; border-radius: 3px; text-transform: uppercase; text-align: center; font-family: monospace; }
+    #cpOkBtn { display: none; }
+
     @media (max-width: 1024px) {
         .sidebar { width: 280px; }
+        .color-picker-box { width: 250px; }
+        .cp-canvas-wrap { width: 180px; height: 180px; }
+        .cp-hue-wrap { height: 180px; }
         button { min-height: 36px; margin-bottom: 2px; }
     }
 </style>
 </head>
 <body>
-    
     <div id="welcomeModal" class="modal-overlay">
         <div class="modal-content">
             <button class="close-modal" id="closeModalBtn">×</button>
@@ -173,10 +242,38 @@
         </div>
     </div>
 
+    <!-- 自定义颜色选择器 -->
+    <div id="colorPickerOverlay">
+        <div class="color-picker-box" id="colorPickerBox">
+            <div class="cp-row">
+                <div class="cp-canvas-wrap" id="cpSVWrap">
+                    <canvas id="cpSatValCanvas" width="190" height="190"></canvas>
+                    <div id="cpSVPointer" class="cp-pointer"></div>
+                </div>
+                <div class="cp-hue-wrap" id="cpHueWrap">
+                    <canvas id="cpHueCanvas" width="25" height="190"></canvas>
+                    <div id="cpHueSlider" class="cp-hue-slider"></div>
+                </div>
+            </div>
+            <div class="cp-row" style="align-items:center;">
+                <div id="cpPreview" class="cp-preview"></div>
+                <span style="color:#aaa;">#</span>
+                <input type="text" id="cpHexInput" class="cp-input" maxlength="7">
+                <button id="cpOkBtn" class="small-btn active" style="display:none">确定</button> 
+            </div>
+        </div>
+    </div>
+
 <div class="viewport" id="viewport">
     <div class="save-indicator"> <div class="dot saved" id="statusDot"></div> <span id="statusText">已保存</span> </div>
     <canvas id="mainCanvas"></canvas>
     
+    <!-- 常驻旋转旋钮 (右上角) -->
+    <div id="rotControl" class="rotation-control"></div>
+
+    <!-- 弹窗提示气泡 -->
+    <div id="toastMsg" class="toast-message"></div>
+
     <div class="shortcut-panel collapsed" id="shortcutPanel">
         <div class="shortcut-header">
             <span id="shortcutTitle">快捷键 / Shortcuts</span>
@@ -206,6 +303,7 @@
             </div>
             <div class="row">
                 <button id="layoutToggleBtn" class="small-btn">⇋ 切换左/右布局</button>
+                <button id="touchDrawToggleBtn" class="small-btn active">🤚 手指绘画: 开</button>
             </div>
         </div>
         <div class="panel-section">
@@ -219,7 +317,9 @@
                 </div>
             </div>
             <div class="row">
-                <div class="color-input-wrapper" title="修改图层颜色"><input type="color" id="layerColorInput"></div>
+                <div class="color-swatch-wrapper" id="layerColorTrigger" title="修改图层颜色">
+                    <div class="color-swatch" id="layerColorSwatch"></div>
+                </div>
                 <div class="btn-group">
                     <button id="modeFillBtn" title="填充模式 (B)">填充</button> <button id="modeStrokeBtn" title="路径模式 (B)">路径</button> <button id="toolEraserBtn" title="橡皮擦 (E)">擦除</button>
                 </div>
@@ -235,8 +335,8 @@
             <div class="section-header">画笔</div>
             <div class="row">
                 <span style="font-size:12px" id="brushSizeLabel">粗细:</span>
-                <input type="range" id="brushSize" min="1" max="100" value="10">
-                <span id="brushSizeVal" style="font-size:11px; width:20px;">10</span>
+                <input type="range" id="brushSize" min="1" max="100" value="5">
+                <span id="brushSizeVal" style="font-size:11px; width:20px;">5</span>
             </div>
         </div>
         <div class="panel-section">
@@ -246,8 +346,10 @@
                 <label for="snapToggle" style="font-size:12px; cursor:pointer;">中线吸附</label> <input type="checkbox" id="snapToggle" checked>
             </div>
             <div class="row">
-                <label for="backgroundColorInput" style="font-size:12px; cursor:pointer;">画布颜色</label>
-                <div class="color-input-wrapper" title="修改画布背景颜色"><input type="color" id="backgroundColorInput"></div>
+                <label for="backgroundColorTrigger" style="font-size:12px; cursor:pointer;">画布颜色</label>
+                <div class="color-swatch-wrapper" id="backgroundColorTrigger" title="修改画布背景颜色">
+                    <div class="color-swatch" id="bgColorSwatch"></div>
+                </div>
             </div>
             <div class="row">
                 <span style="font-size:12px">旋转</span> 
@@ -293,9 +395,6 @@
                 <label for="importJsonInput" class="btn-label json-btn" style="flex-grow: 2;">导入项目 (JSON/ZIP)</label>
                 <input type="file" id="importJsonInput" accept=".json,.zip"> <button id="resetAllBtn" class="reset-btn">重置所有</button>
             </div>
-            <div style="text-align:center;margin:20px 0;font-size:12px;color:#999;">
-                 Copyright © 2026 Elephantzoo | Released under the MIT License
-            </div>
         </div>
     </div>
 </div>
@@ -307,7 +406,8 @@
         constructor(id, name, color) {
             this.id = id; this.name = name; this.visible = true; this.paths = [];
             this.mode = 'stroke'; this.color = color || `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
-            this.strokeWidth = 10; this.opacity = 1;
+            this.strokeWidth = 5;
+            this.opacity = 1;
         }
     }
 
@@ -322,27 +422,37 @@
         onionSkins: { enabled: true, showBefore: true, showAfter: true, opacity: 0.5 },
         onionOnTop: true,
         snapToMidline: true, hasUnsavedChanges: false, dpr: 1, fps: 12,
-        isGesturing: false
+        isGesturing: false,
+        allowTouchDraw: true
     };
 
     const DOM = {};
     let undoStack = [], redoStack = [];
+    
+    // 颜色选择器状态
+    const cpState = {
+        h: 0, s: 0, v: 100,
+        isDraggingSV: false,
+        isDraggingHue: false,
+        targetCallback: null // 回调函数，用于更新颜色
+    };
 
     function init() {
-        const ids = [ "viewport", "mainCanvas", "importJsonInput", "onionToggle", "onionOpacity", "onionOpacityVal", "fpsRange", "fpsVal", "rotationSlider", "currentLayerInput", "layerList", "brushSizeLabel", "brushSize", "brushSizeVal", "statusDot", "statusText", "playBtn", "playbackModeBtn", "snapToggle", "layerColorInput", "layerOpacity", "layerOpacityVal", "modeFillBtn", "modeStrokeBtn", "toolEraserBtn", "undoBtn", "redoBtn", "addLayerBtn", "delLayerBtn", "clearLayerBtn", "resetViewBtn", "exportJsonBtn", "resetAllBtn", "rotateDirBtn", "backgroundColorInput", "onionLayerBtn", "projectNameInput", "copyLayerBtn", "onionBeforeToggle", "onionAfterToggle", "welcomeModal", "closeModalBtn", "layoutToggleBtn", "rotLeftBtn", "rotRightBtn", "sliceDecBtn", "sliceIncBtn", "sliceValDisplay", "shortcutPanel", "shortcutContent", "shortcutToggleBtn", "shortcutTitle" ];
+        const ids = [ "viewport", "mainCanvas", "importJsonInput", "onionToggle", "onionOpacity", "onionOpacityVal", "fpsRange", "fpsVal", "rotationSlider", "currentLayerInput", "layerList", "brushSizeLabel", "brushSize", "brushSizeVal", "statusDot", "statusText", "playBtn", "playbackModeBtn", "snapToggle", "layerOpacity", "layerOpacityVal", "modeFillBtn", "modeStrokeBtn", "toolEraserBtn", "undoBtn", "redoBtn", "addLayerBtn", "delLayerBtn", "clearLayerBtn", "resetViewBtn", "exportJsonBtn", "resetAllBtn", "rotateDirBtn", "onionLayerBtn", "projectNameInput", "copyLayerBtn", "onionBeforeToggle", "onionAfterToggle", "welcomeModal", "closeModalBtn", "layoutToggleBtn", "rotLeftBtn", "rotRightBtn", "sliceDecBtn", "sliceIncBtn", "sliceValDisplay", "shortcutPanel", "shortcutContent", "shortcutToggleBtn", "shortcutTitle", "touchDrawToggleBtn", "rotControl", "toastMsg", 
+            "layerColorTrigger", "layerColorSwatch", "backgroundColorTrigger", "bgColorSwatch", 
+            "colorPickerOverlay", "colorPickerBox", "cpSatValCanvas", "cpHueCanvas", "cpSVPointer", "cpHueSlider", "cpPreview", "cpHexInput", "cpOkBtn", "cpSVWrap", "cpHueWrap"
+        ];
         ids.forEach(id => DOM[id] = document.getElementById(id));
         DOM.ctx = DOM.mainCanvas.getContext('2d');
         state.dpr = window.devicePixelRatio || 1;
         
-        // --- 全局自动失焦 ---
+        // 全局自动失焦
         document.addEventListener('click', (e) => {
             const t = e.target;
             if (t.tagName === 'BUTTON' || t.closest('button')) {
                 (t.tagName === 'BUTTON' ? t : t.closest('button')).blur();
             }
-            if (t.tagName === 'INPUT' && t.type === 'checkbox') {
-                t.blur();
-            }
+            if (t.tagName === 'INPUT' && t.type === 'checkbox') t.blur();
         }, true);
         
         document.querySelectorAll('input[type="range"]').forEach(el => {
@@ -350,17 +460,312 @@
             el.addEventListener('touchend', () => el.blur());
             el.addEventListener('change', () => el.blur());
         });
+        
+        window.lastPencilTime = 0;
 
-        // 核心修复：基于触屏能力的布局检测
         const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-        if (isTouch) {
-            document.body.classList.add('layout-left');
-        }
+        if (isTouch) document.body.classList.add('layout-left');
 
         initShortcutPanel(); 
+        initRotationKnob(); 
+        initColorPicker(); // 初始化自定义取色器
+        
         resizeCanvas(); centerView(); addLayer("图层 1");
         new ResizeObserver(() => { resizeCanvas(); render(); }).observe(DOM.viewport);
         bindEvents(); updateUI(); saveHistory(); requestAnimationFrame(loop);
+    }
+    
+    // --- 颜色转换辅助函数 ---
+    function hsvToRgb(h, s, v) {
+        s /= 100; v /= 100;
+        let c = v * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c, r = 0, g = 0, b = 0;
+        if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+        else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+        else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+        else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+        else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+        else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
+        return { r: Math.round((r + m) * 255), g: Math.round((g + m) * 255), b: Math.round((b + m) * 255) };
+    }
+    function rgbToHsv(r, g, b) {
+        r /= 255; g /= 255; b /= 255;
+        let max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min, h = 0, s = (max === 0 ? 0 : d / max), v = max;
+        if (max !== min) {
+            switch (max) {
+                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                case g: h = (b - r) / d + 2; break;
+                case b: h = (r - g) / d + 4; break;
+            }
+            h /= 6;
+        }
+        return { h: h * 360, s: s * 100, v: v * 100 };
+    }
+    function rgbToHex(r, g, b) {
+        return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
+    }
+    function hexToRgb(hex) {
+        let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+    }
+
+    // --- 颜色选择器逻辑 ---
+    function initColorPicker() {
+        // 渲染色相条
+        const hueCtx = DOM.cpHueCanvas.getContext('2d');
+        const hueGrad = hueCtx.createLinearGradient(0, 0, 0, 200);
+        hueGrad.addColorStop(0, "red");
+        hueGrad.addColorStop(0.17, "#ff0");
+        hueGrad.addColorStop(0.33, "lime");
+        hueGrad.addColorStop(0.5, "cyan");
+        hueGrad.addColorStop(0.67, "blue");
+        hueGrad.addColorStop(0.83, "#f0f");
+        hueGrad.addColorStop(1, "red");
+        hueCtx.fillStyle = hueGrad;
+        hueCtx.fillRect(0, 0, 30, 200);
+
+        // 事件绑定
+        DOM.cpSVWrap.addEventListener('pointerdown', startDragSV);
+        DOM.cpSVWrap.addEventListener('pointermove', dragSV);
+        DOM.cpSVWrap.addEventListener('pointerup', endDrag);
+        
+        DOM.cpHueWrap.addEventListener('pointerdown', startDragHue);
+        DOM.cpHueWrap.addEventListener('pointermove', dragHue);
+        DOM.cpHueWrap.addEventListener('pointerup', endDrag);
+        
+        DOM.cpHexInput.addEventListener('change', (e) => {
+            let hex = e.target.value;
+            if(!hex.startsWith('#')) hex = '#' + hex;
+            const rgb = hexToRgb(hex);
+            if(rgb) {
+                const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+                cpState.h = hsv.h; cpState.s = hsv.s; cpState.v = hsv.v;
+                updateColorPickerUI();
+                applyColor();
+            }
+        });
+    }
+
+    // 处理点击外部关闭的逻辑
+    function handleOutsideClick(e) {
+        const box = DOM.colorPickerBox;
+        const target = e.target;
+        if (box.contains(target)) return;
+        if (target.closest('.color-swatch-wrapper')) return;
+        closeColorPicker();
+    }
+
+    function renderSVCanvas() {
+        const ctx = DOM.cpSatValCanvas.getContext('2d');
+        const w = ctx.canvas.width;
+        const h = ctx.canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        
+        // 1. 底色：当前色相
+        const svBaseColor = hsvToRgb(cpState.h, 100, 100);
+        ctx.fillStyle = `rgb(${svBaseColor.r},${svBaseColor.g},${svBaseColor.b})`;
+        ctx.fillRect(0, 0, w, h);
+        
+        // 2. 水平渐变：白色 -> 透明
+        const grH = ctx.createLinearGradient(0, 0, w, 0);
+        grH.addColorStop(0, "#fff");
+        grH.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = grH;
+        ctx.fillRect(0, 0, w, h);
+        
+        // 3. 垂直渐变：透明 -> 黑色
+        const grV = ctx.createLinearGradient(0, 0, 0, h);
+        grV.addColorStop(0, "rgba(0,0,0,0)");
+        grV.addColorStop(1, "#000");
+        ctx.fillStyle = grV;
+        ctx.fillRect(0, 0, w, h);
+    }
+
+    function updateColorPickerUI() {
+        renderSVCanvas();
+        const svW = DOM.cpSatValCanvas.width;
+        const svH = DOM.cpSatValCanvas.height;
+        
+        const x = (cpState.s / 100) * svW;
+        const y = ((100 - cpState.v) / 100) * svH;
+        DOM.cpSVPointer.style.left = x + 'px';
+        DOM.cpSVPointer.style.top = y + 'px';
+        
+        const hueY = (cpState.h / 360) * DOM.cpHueCanvas.height;
+        DOM.cpHueSlider.style.top = hueY + 'px';
+        
+        const rgb = hsvToRgb(cpState.h, cpState.s, cpState.v);
+        const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+        DOM.cpPreview.style.background = hex;
+        DOM.cpHexInput.value = hex;
+    }
+
+    // 智能定位开启函数
+    function openColorPicker(initialHex, callback, triggerEl) {
+        cpState.targetCallback = callback;
+        const rgb = hexToRgb(initialHex) || {r:255, g:0, b:0};
+        const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+        cpState.h = hsv.h; cpState.s = hsv.s; cpState.v = hsv.v;
+        
+        updateColorPickerUI();
+        DOM.colorPickerOverlay.style.display = 'block';
+        
+        // --- 核心改动：智能计算位置，不挡住按钮 ---
+        if (triggerEl) {
+            const rect = triggerEl.getBoundingClientRect();
+            const box = DOM.colorPickerBox;
+            const isLeftLayout = document.body.classList.contains('layout-left');
+            const gap = 12; // 间距
+            
+            // 默认清空旧样式
+            box.style.top = ''; box.style.left = ''; box.style.right = ''; box.style.bottom = '';
+            
+            // 垂直位置：尽量和按钮顶部对齐，但防止超出屏幕下边缘
+            let topPos = rect.top - 10;
+            const boxHeight = 290; // 预估高度
+            if (topPos + boxHeight > window.innerHeight) {
+                topPos = window.innerHeight - boxHeight - 20;
+            }
+            if (topPos < 10) topPos = 10;
+            box.style.top = topPos + 'px';
+
+            if (isLeftLayout) {
+                // 侧边栏在左，Picker 显示在按钮右侧
+                box.style.left = (rect.right + gap) + 'px';
+                box.style.right = 'auto';
+            } else {
+                // 侧边栏在右（默认），Picker 显示在按钮左侧
+                // 注意：使用 right 属性相对于视口右侧定位可能更稳，或者算 left
+                // 这里我们算 left，按钮左边 - 盒子宽度 - 间距
+                // 由于 CSS 中 box width 是 260px (padding 15*2 = 290 total width approx)
+                // 我们可以直接用 right 属性简单点： windowWidth - rect.left + gap
+                box.style.left = 'auto';
+                box.style.right = (window.innerWidth - rect.left + gap) + 'px';
+            }
+        }
+        
+        setTimeout(() => {
+            document.addEventListener('pointerdown', handleOutsideClick);
+        }, 0);
+    }
+
+    function closeColorPicker() {
+        DOM.colorPickerOverlay.style.display = 'none';
+        cpState.targetCallback = null;
+        document.removeEventListener('pointerdown', handleOutsideClick);
+    }
+
+    function applyColor() {
+        const rgb = hsvToRgb(cpState.h, cpState.s, cpState.v);
+        const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+        if(cpState.targetCallback) cpState.targetCallback(hex);
+    }
+
+    function startDragSV(e) {
+        cpState.isDraggingSV = true;
+        DOM.cpSVWrap.setPointerCapture(e.pointerId);
+        updateSVFromEvent(e);
+    }
+    function dragSV(e) {
+        if(!cpState.isDraggingSV) return;
+        updateSVFromEvent(e);
+    }
+    function updateSVFromEvent(e) {
+        const rect = DOM.cpSVWrap.getBoundingClientRect();
+        let x = e.clientX - rect.left;
+        let y = e.clientY - rect.top;
+        const w = rect.width;
+        const h = rect.height;
+        x = Math.max(0, Math.min(w, x));
+        y = Math.max(0, Math.min(h, y));
+        
+        cpState.s = (x / w) * 100;
+        cpState.v = 100 - (y / h) * 100;
+        updateColorPickerUI();
+        applyColor();
+    }
+
+    function startDragHue(e) {
+        cpState.isDraggingHue = true;
+        DOM.cpHueWrap.setPointerCapture(e.pointerId);
+        updateHueFromEvent(e);
+    }
+    function dragHue(e) {
+        if(!cpState.isDraggingHue) return;
+        updateHueFromEvent(e);
+    }
+    function updateHueFromEvent(e) {
+        const rect = DOM.cpHueWrap.getBoundingClientRect();
+        let y = e.clientY - rect.top;
+        const h = rect.height;
+        y = Math.max(0, Math.min(h, y));
+        
+        cpState.h = (y / h) * 360;
+        updateColorPickerUI();
+        applyColor(); 
+    }
+    function endDrag(e) {
+        cpState.isDraggingSV = false;
+        cpState.isDraggingHue = false;
+        e.target.releasePointerCapture(e.pointerId);
+    }
+
+    // Toast 提示函数
+    function showToast(msg) {
+        DOM.toastMsg.innerText = msg;
+        DOM.toastMsg.classList.add('show');
+        clearTimeout(window.toastTimer);
+        window.toastTimer = setTimeout(() => {
+            DOM.toastMsg.classList.remove('show');
+        }, 1000);
+    }
+    
+    // 初始化右上角旋钮逻辑
+    function initRotationKnob() {
+        const knob = DOM.rotControl;
+        let isKnobRotating = false;
+        let knobStartAngle = 0;
+        let viewStartRot = 0;
+        
+        const getKnobAngle = (clientX, clientY) => {
+            const rect = knob.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            return Math.atan2(clientY - cy, clientX - cx) * 180 / Math.PI;
+        };
+
+        const startKnob = (e) => {
+            e.preventDefault(); e.stopPropagation();
+            isKnobRotating = true;
+            knob.setPointerCapture(e.pointerId);
+            knobStartAngle = getKnobAngle(e.clientX, e.clientY);
+            viewStartRot = state.viewRotation;
+        };
+
+        const moveKnob = (e) => {
+            if (!isKnobRotating) return;
+            e.preventDefault(); e.stopPropagation();
+            const currentAngle = getKnobAngle(e.clientX, e.clientY);
+            let delta = currentAngle - knobStartAngle;
+            if (delta > 180) delta -= 360;
+            if (delta < -180) delta += 360;
+            
+            state.viewRotation = viewStartRot + delta;
+            
+            if (state.snapToMidline) snapRotation();
+            DOM.rotationSlider.value = state.viewRotation;
+            render();
+        };
+
+        const endKnob = (e) => {
+            if (!isKnobRotating) return;
+            isKnobRotating = false;
+            knob.releasePointerCapture(e.pointerId);
+        };
+
+        knob.addEventListener('pointerdown', startKnob);
+        knob.addEventListener('pointermove', moveKnob);
+        knob.addEventListener('pointerup', endKnob);
+        knob.addEventListener('pointercancel', endKnob);
     }
     
     function initShortcutPanel() {
@@ -373,8 +778,9 @@
         const touchShortcuts = `
             <span><strong>单指/Pencil</strong> 绘画</span>
             <span><strong>双指按住</strong> 平移/缩放</span>
-            <span><strong>双指旋转</strong> 旋转画布</span>
+            <span><strong>旋钮</strong> 旋转画布</span>
             <span><strong>双指点击</strong> 撤销 | <strong>三指点击</strong> 重做</span>
+            <span style="color:#aaa; font-size:11px; display:block; width:100%; margin-top:4px;">* 关闭手指绘画时，单指快速下滑/上滑可切帧</span>
         `;
         
         DOM.shortcutContent.innerHTML = isTouch ? touchShortcuts : pcShortcuts;
@@ -382,8 +788,7 @@
         
         DOM.shortcutToggleBtn.onclick = () => {
             DOM.shortcutPanel.classList.toggle('collapsed');
-            const isCollapsed = DOM.shortcutPanel.classList.contains('collapsed');
-            DOM.shortcutToggleBtn.innerText = isCollapsed ? "▲" : "▼";
+            DOM.shortcutToggleBtn.innerText = DOM.shortcutPanel.classList.contains('collapsed') ? "▲" : "▼";
         };
         
         DOM.shortcutPanel.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -406,22 +811,13 @@
         ctx.clip();
         
         const activeLayer = getActiveLayer();
-        if (state.onionSkins.enabled && !state.isPlaying && activeLayer && !state.onionOnTop) {
-            renderOnionSkins(ctx);
-        }
-        
+        if (state.onionSkins.enabled && !state.isPlaying && activeLayer && !state.onionOnTop) renderOnionSkins(ctx);
         state.layers.forEach(layer => { if (layer.visible) renderLayer(ctx, layer); });
-        
         if (state.isDrawing && state.currentBrushPath.length > 0) renderLayer(ctx, { ...getActiveLayer(), paths: [new Path(state.currentBrushPath)] });
-        
-        if (state.onionSkins.enabled && !state.isPlaying && activeLayer && state.onionOnTop) {
-            renderOnionSkins(ctx);
-        }
+        if (state.onionSkins.enabled && !state.isPlaying && activeLayer && state.onionOnTop) renderOnionSkins(ctx);
         ctx.restore();
         
-        if (!state.isPlaying) {
-            ctx.save(); setupTransform(ctx); drawGrid(ctx); ctx.restore();
-        }
+        if (!state.isPlaying) { ctx.save(); setupTransform(ctx); drawGrid(ctx); ctx.restore(); }
         
         if (state.isCursorInCanvas && !state.isPanning && !state.isRotating && !state.isGesturing) {
             const activeLayer = getActiveLayer();
@@ -430,7 +826,6 @@
                 ctx.lineWidth = 1;
                 ctx.strokeStyle = state.currentTool === 'eraser' ? 'rgba(231, 76, 60, 0.9)' : 'rgba(100,100,100,0.8)';
                 const showCrosshair = state.currentTool === 'eraser' || (state.currentTool === 'brush' && activeLayer.mode === 'fill');
-                
                 if (showCrosshair) {
                     const crosshairSize = 10;
                     ctx.beginPath();
@@ -448,6 +843,11 @@
                 ctx.restore();
             }
         }
+        
+        if (DOM.rotControl) {
+            DOM.rotControl.style.transform = `rotate(${state.viewRotation}deg)`;
+        }
+        
         ctx.restore();
     }
     
@@ -458,7 +858,6 @@
         ctx.globalAlpha = layer.opacity;
         ctx.strokeStyle = layer.color;
         ctx.fillStyle = layer.color;
-        // 移除压感，使用固定粗细
         ctx.lineWidth = layer.strokeWidth;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -505,12 +904,16 @@
     function updateUI() {
         DOM.projectNameInput.value = state.projectName;
         const activeLayer = getActiveLayer(); const hasLayers = activeLayer !== null;
-        DOM.currentLayerInput.disabled = !hasLayers; DOM.layerColorInput.disabled = !hasLayers;
+        DOM.currentLayerInput.disabled = !hasLayers; 
+        // DOM.layerColorInput.disabled = !hasLayers; // Removed old input control
         DOM.modeFillBtn.disabled = !hasLayers; DOM.modeStrokeBtn.disabled = !hasLayers;
         DOM.toolEraserBtn.disabled = !hasLayers; DOM.brushSize.disabled = !hasLayers;
         DOM.layerOpacity.disabled = !hasLayers; DOM.delLayerBtn.disabled = state.layers.length <= 1;
         if (hasLayers) {
-            DOM.currentLayerInput.value = activeLayer.name; DOM.layerColorInput.value = activeLayer.color;
+            DOM.currentLayerInput.value = activeLayer.name; 
+            // Update color swatch
+            DOM.layerColorSwatch.style.backgroundColor = activeLayer.color;
+            
             DOM.modeFillBtn.classList.toggle('active', state.currentTool === 'brush' && activeLayer.mode === 'fill');
             DOM.modeStrokeBtn.classList.toggle('active', state.currentTool === 'brush' && activeLayer.mode === 'stroke');
             DOM.toolEraserBtn.classList.toggle('active', state.currentTool === 'eraser');
@@ -518,7 +921,10 @@
             DOM.layerOpacity.value = activeLayer.opacity; DOM.layerOpacityVal.textContent = activeLayer.opacity.toFixed(2);
         } else { DOM.currentLayerInput.value = "无图层"; }
         DOM.undoBtn.disabled = undoStack.length <= 1; DOM.redoBtn.disabled = redoStack.length === 0;
-        DOM.backgroundColorInput.value = state.backgroundColor;
+        
+        // Update bg swatch
+        DOM.bgColorSwatch.style.backgroundColor = state.backgroundColor;
+        
         DOM.onionLayerBtn.textContent = state.onionOnTop ? '洋葱皮 ▲ 置顶' : '洋葱皮 ▼ 置底';
         DOM.onionLayerBtn.classList.toggle('active', state.onionOnTop);
         DOM.onionToggle.checked = state.onionSkins.enabled;
@@ -528,27 +934,39 @@
         document.querySelector('label[for="onionAfterToggle"]').classList.toggle('active', state.onionSkins.showAfter && state.onionSkins.enabled);
         DOM.onionOpacityVal.textContent = state.onionSkins.opacity.toFixed(2);
         DOM.onionOpacity.value = state.onionSkins.opacity;
-        
-        // 更新扇形数显示
         DOM.sliceValDisplay.textContent = state.sliceCount;
-        
+        DOM.touchDrawToggleBtn.textContent = state.allowTouchDraw ? "🤚 手指绘画: 开" : "🚫 手指绘画: 关";
+        DOM.touchDrawToggleBtn.classList.toggle('active', state.allowTouchDraw);
+        if(!state.allowTouchDraw) DOM.touchDrawToggleBtn.style.background = 'var(--danger-color)';
+        else DOM.touchDrawToggleBtn.style.background = '';
         renderLayerList();
     }
     
     function renderLayerList() {
         DOM.layerList.innerHTML = '';
-        state.layers.forEach(layer => {
+        state.layers.forEach((layer, i) => {
             const div = document.createElement('div');
             div.className = `layer-item ${layer.id === getActiveLayer()?.id ? 'active' : ''}`;
             div.dataset.layerId = layer.id;
             div.draggable = true;
+            
             const vis = document.createElement('span'); vis.className = 'layer-vis';
             vis.innerHTML = layer.visible ? '👁️' : '🚫';
             vis.onclick = (e) => { e.stopPropagation(); toggleLayerVisibility(layer.id); };
+            
             const nameBox = document.createElement('span'); nameBox.className = 'layer-name'; nameBox.innerText = layer.name;
             const colorIndicator = document.createElement('div');
             colorIndicator.style.cssText = `width:12px; height:12px; background-color:${layer.color}; border-radius:3px; border:1px solid #222; flex-shrink:0; opacity:${layer.opacity};`;
+            
+            const upBtn = document.createElement('button'); upBtn.className = 'layer-move-btn'; upBtn.innerHTML = '↑';
+            upBtn.onclick = (e) => { e.stopPropagation(); moveLayer(i, 1); };
+            
+            const downBtn = document.createElement('button'); downBtn.className = 'layer-move-btn'; downBtn.innerHTML = '↓';
+            downBtn.onclick = (e) => { e.stopPropagation(); moveLayer(i, -1); };
+
             div.appendChild(vis); div.appendChild(colorIndicator); div.appendChild(nameBox);
+            div.appendChild(upBtn); div.appendChild(downBtn);
+            
             div.onclick = () => setActiveLayer(state.layers.findIndex(l => l.id === layer.id));
             div.addEventListener('dragstart', handleDragStart);
             div.addEventListener('dragover', handleDragOver);
@@ -562,6 +980,17 @@
     function getActiveLayer() { return state.activeLayerIndex > -1 ? state.layers[state.activeLayerIndex] : null; }
     function addLayer(name, color) { const newLayer = new Layer(Date.now(), name || `图层 ${state.layers.length + 1}`, color); state.layers.push(newLayer); setActiveLayer(state.layers.length - 1); saveHistory(); }
     
+    function moveLayer(index, direction) {
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= state.layers.length) return;
+        const temp = state.layers[index];
+        state.layers[index] = state.layers[newIndex];
+        state.layers[newIndex] = temp;
+        if (state.activeLayerIndex === index) state.activeLayerIndex = newIndex;
+        else if (state.activeLayerIndex === newIndex) state.activeLayerIndex = index;
+        saveHistory(); renderLayerList(); render();
+    }
+
     function deleteLayer() { 
         if (state.layers.length <= 1) return; 
         const layer = getActiveLayer();
@@ -589,8 +1018,8 @@
     function findClosestPath(pos) { const layer = getActiveLayer(); if (!layer) return null; let closestPath = null, minDistance = Infinity; for (const path of layer.paths) { if(state.pathsToErase.has(path.id)) continue; for (const point of path.points) { const dist = Math.hypot(pos.x - point.x, pos.y - point.y); if (dist < minDistance) { minDistance = dist; closestPath = path; } } } return (minDistance < (layer.strokeWidth/2 + 5) / state.zoom) ? closestPath : null; }
     function saveHistory() { const snapshot = JSON.stringify({ layers: state.layers, activeLayerIndex: state.activeLayerIndex }); undoStack.push(snapshot); if (undoStack.length > CONFIG.maxHistory) undoStack.shift(); redoStack = []; if (undoStack.length > 1) { setUnsaved(true); } updateUI(); }
     function loadHistory(snapshot) { const data = JSON.parse(snapshot); state.layers = data.layers; state.activeLayerIndex = data.activeLayerIndex; updateUI(); render(); }
-    function undo() { if (undoStack.length <= 1) return; redoStack.push(undoStack.pop()); loadHistory(undoStack[undoStack.length-1]); }
-    function redo() { if (redoStack.length === 0) return; const stateToLoad = redoStack.pop(); undoStack.push(stateToLoad); loadHistory(stateToLoad); }
+    function undo() { if (undoStack.length <= 1) return; redoStack.push(undoStack.pop()); loadHistory(undoStack[undoStack.length-1]); showToast("↪ 撤销"); }
+    function redo() { if (redoStack.length === 0) return; const stateToLoad = redoStack.pop(); undoStack.push(stateToLoad); loadHistory(stateToLoad); showToast("↩ 重做"); }
     function setUnsaved(val) { state.hasUnsavedChanges = val; DOM.statusDot.className = `dot ${val ? 'unsaved' : 'saved'}`; DOM.statusText.innerText = val ? '未保存' : '已保存'; }
     function handleDragStart(e) { e.currentTarget.classList.add('dragging'); state.draggedLayerId = parseFloat(e.currentTarget.dataset.layerId); e.dataTransfer.effectAllowed = 'move'; }
     function handleDragOver(e) { e.preventDefault(); const target = e.currentTarget; if (parseFloat(target.dataset.layerId) !== state.draggedLayerId) { target.classList.add('drag-over'); } }
@@ -616,7 +1045,6 @@
         } catch (err) { alert('导入失败: 无效的文件格式或内容。\n' + err.message); console.error(err); }
     }
     
-    // 旋转辅助函数
     function rotateView(direction) {
         state.viewRotation += direction * (360 / state.sliceCount);
         state.viewRotation = (state.viewRotation % 360 + 360) % 360;
@@ -629,23 +1057,43 @@
         // --- Pointer Events (绘画与单指操作) ---
         
         DOM.viewport.addEventListener('pointerdown', e => { 
-            if (state.isGesturing) return; // 手势中禁止绘图
+            if (state.isGesturing) return; 
             if (e.pointerType === 'touch' && !e.isPrimary) return; 
 
-            e.preventDefault();
-            
-            // --- 已移除双击切换功能 ---
+            // 1. Pencil: 始终绘画，优先级最高
+            if (e.pointerType === 'pen') {
+                window.lastPencilTime = Date.now(); // 更新 Pencil 活跃时间
+                e.preventDefault();
+                DOM.viewport.setPointerCapture(e.pointerId); 
+                state.isCursorInCanvas = true;
+                if (state.currentTool === 'eraser') {
+                    state.isErasing = true;
+                    const pos = getScreenToWorldPos(e.clientX, e.clientY);
+                    const pathToErase = findClosestPath(pos);
+                    if (pathToErase) state.pathsToErase.add(pathToErase.id);
+                } else {
+                    state.isDrawing = true;
+                    state.currentBrushPath = [getScreenToWorldPos(e.clientX, e.clientY)];
+                }
+                return;
+            }
 
+            e.preventDefault();
+
+            // 2. 正常绘画/平移逻辑
             DOM.viewport.setPointerCapture(e.pointerId); 
             state.isCursorInCanvas = true; 
 
-            if (e.button === 1 || state.isPanning) { startDrag(e); return; } 
+            if (e.button === 1 || state.isPanning) { 
+                startDrag(e); 
+                return; 
+            }
             
             if (state.isRotating) { 
                 state.dragStartAngle = getMouseAngle(e.clientX, e.clientY); 
                 state.dragStartViewRot = state.viewRotation; 
                 return; 
-            } 
+            }
             
             const pos = getScreenToWorldPos(e.clientX, e.clientY); 
             if (state.currentTool === 'eraser') { 
@@ -653,14 +1101,21 @@
                 const pathToErase = findClosestPath(pos); 
                 if (pathToErase) state.pathsToErase.add(pathToErase.id); 
             } else if (state.currentTool === 'brush') { 
-                state.isDrawing = true; 
-                state.currentBrushPath = [pos]; 
+                // 只有允许手指绘画才画
+                if (!e.pointerType.includes('touch') || state.allowTouchDraw) {
+                    state.isDrawing = true; 
+                    state.currentBrushPath = [pos]; 
+                }
             } 
         });
 
         DOM.viewport.addEventListener('pointermove', e => { 
             if (state.isGesturing) return;
             if (e.pointerType === 'touch' && !e.isPrimary) return;
+            
+            if (e.pointerType === 'pen') {
+                 window.lastPencilTime = Date.now();
+            }
 
             e.preventDefault();
 
@@ -728,10 +1183,12 @@
             render(); 
         });
 
-        DOM.viewport.addEventListener('pointerleave', () => { state.isCursorInCanvas = false; state.isDrawing = false; state.isErasing = false; state.drag.isActive = false; state.currentBrushPath = []; state.pathsToErase.clear(); render(); });
+        DOM.viewport.addEventListener('pointerleave', () => { 
+            state.isCursorInCanvas = false; state.isDrawing = false; state.isErasing = false; state.drag.isActive = false; state.currentBrushPath = []; state.pathsToErase.clear(); render(); 
+        });
         DOM.viewport.addEventListener('pointerenter', () => { state.isCursorInCanvas = true; });
 
-        // --- Touch Events (核心手势逻辑 - 包含误触修复) ---
+        // --- Touch Events ---
         let startTouches = [];
         let startPan = { x: 0, y: 0 };
         let startZoom = 1;
@@ -742,9 +1199,9 @@
         let isRotationLocked = false;
         let touchStartTime = 0;
         let maxTouches = 0;
-        let touchTotalMovement = 0; // 新增：记录总移动距离
+        let touchTotalMovement = 0; 
         
-        // 旋转阈值 (度)
+        let singleSwipeStartY = 0; // 单指滑动的起始Y
         const ROTATION_THRESHOLD = 15;
 
         DOM.viewport.addEventListener('touchstart', e => {
@@ -757,7 +1214,8 @@
             maxTouches = Math.max(maxTouches, e.touches.length);
             if (e.touches.length === 1) {
                 touchStartTime = Date.now();
-                touchTotalMovement = 0; // 重置移动距离
+                touchTotalMovement = 0; 
+                singleSwipeStartY = e.touches[0].clientY;
             }
 
             if (e.touches.length === 2) {
@@ -765,7 +1223,7 @@
                 startZoom = state.zoom;
                 startRot = state.viewRotation;
                 isRotationLocked = false; 
-                touchTotalMovement = 0; // 重置
+                touchTotalMovement = 0; 
 
                 const p1 = { x: e.touches[0].clientX, y: e.touches[0].clientY };
                 const p2 = { x: e.touches[1].clientX, y: e.touches[1].clientY };
@@ -778,7 +1236,6 @@
 
         DOM.viewport.addEventListener('touchmove', e => {
             if (e.touches.length > 0) {
-                // 简单的位移累加逻辑
                 const touch = e.touches[0];
                 if (window.lastTouchX) {
                     const dx = touch.clientX - window.lastTouchX;
@@ -791,17 +1248,13 @@
 
             if (e.touches.length === 2) {
                 e.preventDefault(); 
-                
                 const p1 = { x: e.touches[0].clientX, y: e.touches[0].clientY };
                 const p2 = { x: e.touches[1].clientX, y: e.touches[1].clientY };
-                
                 const currCenter = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
                 const currDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
                 const currAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI;
-
                 const angleDiff = currAngle - startAngle;
                 
-                // 增加阈值到15度，防止误触
                 if (!isRotationLocked && Math.abs(angleDiff) > ROTATION_THRESHOLD) {
                     isRotationLocked = true; 
                 }
@@ -813,17 +1266,13 @@
                     const newZoom = Math.max(0.1, Math.min(10, startZoom * scaleFactor));
                     const dx = currCenter.x - startCenter.x;
                     const dy = currCenter.y - startCenter.y;
-
                     const rect = DOM.viewport.getBoundingClientRect();
                     const viewStartX = startCenter.x - rect.left;
                     const viewStartY = startCenter.y - rect.top;
-                    
                     const worldOffsetX = viewStartX - startPan.x;
                     const worldOffsetY = viewStartY - startPan.y;
-                    
                     state.panX = (viewStartX + dx) - (worldOffsetX * (newZoom / startZoom));
                     state.panY = (viewStartY + dy) - (worldOffsetY * (newZoom / startZoom));
-                    
                     state.zoom = newZoom;
                 }
 
@@ -840,23 +1289,39 @@
                 window.lastTouchY = null;
                 
                 const duration = Date.now() - touchStartTime;
-                // 核心修复：只有在移动距离非常小（小于10px）时才认为是点击
+                
+                // 1. 点击判断：位移极小且时间短
                 if (duration < 300 && touchTotalMovement < 10) { 
                     if (maxTouches === 2) undo(); 
                     else if (maxTouches === 3) redo(); 
                 }
+                
+                // 2. 核心修正：单指滑动切帧 (仅限：单指 + 禁止绘画模式 + Pencil不活跃)
+                // 增加检测：如果最近 500ms 内有 Pencil 活动，则禁止切帧（防止手掌误触）
+                const isPencilActive = (Date.now() - (window.lastPencilTime || 0) < 500);
+
+                if (maxTouches === 1 && !state.allowTouchDraw && !isPencilActive && duration < 250 && touchTotalMovement > 30) {
+                    const endY = e.changedTouches[0].clientY;
+                    const deltaY = endY - singleSwipeStartY;
+                    if (Math.abs(deltaY) > 30) {
+                        // 下滑 -> 正向(右键) -> 顺时针
+                        if (deltaY > 0) rotateView(-1); 
+                        // 上滑 -> 反向(左键) -> 逆时针
+                        else rotateView(1); 
+                    }
+                }
+                
                 maxTouches = 0;
             }
         });
 
+        // 按钮事件绑定
         function startDrag(e) { state.drag.isActive = true; state.drag.startX = e.clientX; state.drag.startY = e.clientY; state.drag.startPanX = state.panX; state.drag.startPanY = state.panY; }
         function doDrag(e) { if (!state.drag.isActive) return; state.panX = state.drag.startPanX + (e.clientX - state.drag.startX); state.panY = state.drag.startPanY + (e.clientY - state.drag.startY); render(); }
         DOM.viewport.addEventListener('wheel', e => { e.preventDefault(); if (e.shiftKey) { rotateView(e.deltaY > 0 ? -0.2 : 0.2); } else { const rect = DOM.mainCanvas.getBoundingClientRect(); const mx = e.clientX - rect.left, my = e.clientY - rect.top; const zoomFactor = 1.1; let newZoom = state.zoom * (e.deltaY < 0 ? zoomFactor : 1 / zoomFactor); newZoom = Math.max(0.1, Math.min(newZoom, 10)); const offsetX = (mx - state.panX), offsetY = (my - state.panY); state.panX = mx - (offsetX * (newZoom / state.zoom)); state.panY = my - (offsetY * (newZoom / state.zoom)); state.zoom = newZoom; } render(); }, { passive: false });
         
         window.addEventListener('keydown', e => { 
-            // 修复：只有文字输入框才允许捕获焦点，否则Space键应当平移
             if (e.target.matches('input') && e.target.type === 'text') return; 
-            
             if (e.ctrlKey || e.metaKey) { if (e.key.toLowerCase() === 'z' && e.shiftKey) { e.preventDefault(); redo(); } else if (e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); } if (e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); } if (e.key === '0') { e.preventDefault(); centerView(); } return; } 
             if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') { e.preventDefault(); const direction = e.code === 'ArrowLeft' ? 1 : -1; rotateView(direction); } 
             if(e.key === '[' || e.key === ']') { const layer = getActiveLayer(); if(layer) { const change = e.key === '[' ? -1 : 1; const newWidth = Math.max(1, Math.min(100, parseInt(layer.strokeWidth) + change)); changeActiveLayerProperty('strokeWidth', newWidth); } } 
@@ -878,12 +1343,28 @@
         DOM.redoBtn.onclick = redo;
         DOM.resetViewBtn.onclick = centerView;
         DOM.currentLayerInput.onchange = e => changeActiveLayerProperty('name', e.target.value);
-        DOM.layerColorInput.oninput = e => changeActiveLayerProperty('color', e.target.value);
+        // DOM.layerColorInput.oninput = e => changeActiveLayerProperty('color', e.target.value);
         DOM.brushSize.oninput = e => { const layer = getActiveLayer(); if (layer) { layer.strokeWidth = e.target.value; updateUI(); render(); } };
         DOM.brushSize.onchange = () => saveHistory();
         DOM.layerOpacity.oninput = e => { const layer = getActiveLayer(); if (layer) { layer.opacity = parseFloat(e.target.value); updateUI(); render(); } };
         DOM.layerOpacity.onchange = () => saveHistory();
-        DOM.backgroundColorInput.oninput = e => { state.backgroundColor = e.target.value; updateUI(); render(); };
+        // DOM.backgroundColorInput.oninput = e => { state.backgroundColor = e.target.value; updateUI(); render(); };
+        
+        // 自定义取色器触发 - 修复：传入 this 
+        DOM.layerColorTrigger.onclick = function() {
+            const layer = getActiveLayer();
+            if(layer) openColorPicker(layer.color, (hex) => {
+                changeActiveLayerProperty('color', hex);
+                DOM.layerColorSwatch.style.backgroundColor = hex;
+            }, this);
+        };
+        DOM.backgroundColorTrigger.onclick = function() {
+            openColorPicker(state.backgroundColor, (hex) => {
+                state.backgroundColor = hex;
+                DOM.bgColorSwatch.style.backgroundColor = hex;
+                render();
+            }, this);
+        };
         
         DOM.modeFillBtn.onclick = () => { 
             state.currentTool = 'brush'; 
@@ -918,7 +1399,6 @@
         DOM.onionOpacity.oninput = e => { state.onionSkins.opacity = parseFloat(e.target.value); updateUI(); render(); };
         DOM.snapToggle.onchange = e => { state.snapToMidline = e.target.checked; if (state.snapToMidline) { snapRotation(); render(); } };
         
-        // 扇形数按钮逻辑
         DOM.sliceDecBtn.onclick = () => { state.sliceCount = Math.max(4, state.sliceCount - 1); updateUI(); render(); };
         DOM.sliceIncBtn.onclick = () => { state.sliceCount = Math.min(24, state.sliceCount + 1); updateUI(); render(); };
         
@@ -938,6 +1418,11 @@
         };
         DOM.rotLeftBtn.onclick = () => rotateView(1);
         DOM.rotRightBtn.onclick = () => rotateView(-1);
+        
+        DOM.touchDrawToggleBtn.onclick = () => {
+            state.allowTouchDraw = !state.allowTouchDraw;
+            updateUI();
+        };
 
         DOM.exportJsonBtn.onclick = async () => {
             const originalButtonText = DOM.exportJsonBtn.textContent;
