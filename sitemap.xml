@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://elephantzoo.pages.dev</loc>
+    <loc>https://elephantzoo.pages.dev/</loc>
     <lastmod>2026-01-12</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://elephantzoo.pages.dev/" />
+    <xhtml:title>Phenakistiscope Animation Tool v12.3 - Free Online Maker</xhtml:title>
+    <xhtml:description>Free online Phenakistiscope animation tool - Create, edit, export with layers & onion skin. Open-source non-commercial.</xhtml:description>
   </url>
 </urlset>
