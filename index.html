@@ -1447,6 +1447,7 @@
             } catch (error) { console.error("导出 ZIP 失败:", error); alert("导出失败，请打开开发者控制台查看错误信息。"); } finally { DOM.exportJsonBtn.textContent = originalButtonText; DOM.exportJsonBtn.disabled = false; }
         };
         DOM.importJsonInput.onchange = async (e) => {
+            e.target.blur()
             if (!e.target.files.length) return;
             const file = e.target.files[0];
             e.target.value = '';
