@@ -25,7 +25,7 @@ https://elephantzoo.pages.dev/
 | 撤销       | Ctrl+Z  |
 | 重做       | Ctrl+Y  |
 | 复位视图   | Ctrl+0  |
-| 调整画笔粗细 | [/]  |
+| 调整画笔粗细 | [ / ]  |
 | 微调旋转   | ← / →   |
 
 ### 📝 许可说明
@@ -68,7 +68,7 @@ https://elephantzoo.pages.dev/
 | Undo              | Ctrl+Z   |
 | Redo              | Ctrl+Y   |
 | Reset view        | Ctrl+0   |
-| Adjust brush size | [/]    |
+| Adjust brush size | [ / ]    |
 | Fine-tune rotation| ← / →    |
 
 ### 📝 License
