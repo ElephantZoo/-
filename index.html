@@ -1369,11 +1369,22 @@
                 
                 const duration = Date.now() - touchStartTime;
                 
-                if (duration < 500 && touchTotalMovement < 50) { 
+                // --- 修改开始：针对三指重做给予更宽松的判定 ---
+                
+                // 定义不同的阈值
+                // 2指撤销：允许 50px 晃动，0.5秒内
+                // 3指重做：允许 150px 晃动 (三指累积误差大)，0.8秒内 (三指同步慢)
+                const moveLimit = maxTouches === 3 ? 150 : 50; 
+                const timeLimit = maxTouches === 3 ? 800 : 500;
+                
+                if (duration < timeLimit && touchTotalMovement < moveLimit) { 
                     if (maxTouches === 2) undo(); 
                     else if (maxTouches === 3) redo(); 
                 }
+                // --- 修改结束 ---
                 
+                
+                // 2. 核心修正：单指滑动切帧 (保持不变)
                 const isPencilActive = (Date.now() - (window.lastPencilTime || 0) < 500);
 
                 if (maxTouches === 1 && !state.allowTouchDraw && !isPencilActive && duration < 250 && touchTotalMovement > 30) {
