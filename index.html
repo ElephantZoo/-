@@ -349,7 +349,7 @@
             <div class="layer-list" id="layerList"></div>
         </div>
         <div class="panel-section">
-            <div class="section-header">画笔</div>
+            <div class="section-header">路径粗细</div>
             <div class="row">
                 <span style="font-size:12px" id="brushSizeLabel">粗细:</span>
                 <input type="range" id="brushSize" min="1" max="100" value="5">
@@ -890,20 +890,41 @@
         ctx.strokeStyle = layer.color;
         ctx.fillStyle = layer.color;
         ctx.lineWidth = layer.strokeWidth;
-        ctx.lineCap = 'round';
+        ctx.lineCap = 'round'; // 关键：必须是圆头
         ctx.lineJoin = 'round';
+        
         layer.paths.forEach(path => {
+            // 忽略被擦除的路径
             if (state.isErasing && state.pathsToErase.has(path.id)) return;
             if (path.points.length < 1) return;
+
             ctx.beginPath();
             ctx.moveTo(path.points[0].x, path.points[0].y);
-            for (let i = 1; i < path.points.length; i++) ctx.lineTo(path.points[i].x, path.points[i].y);
-            if (layer.mode === 'fill') { if (path.points.length > 1) ctx.closePath(); ctx.fill(); } else { ctx.stroke(); }
+
+            // --- 修改开始：处理单点情况 ---
+            if (path.points.length === 1) {
+                // 如果只有一个点，画一条“到自己”的线
+                // 配合 lineCap='round' 会画出一个圆点
+                ctx.lineTo(path.points[0].x, path.points[0].y);
+            } else {
+                // 如果有多个点，正常连线
+                for (let i = 1; i < path.points.length; i++) {
+                    ctx.lineTo(path.points[i].x, path.points[i].y);
+                }
+            }
+            // --- 修改结束 ---
+
+            if (layer.mode === 'fill') { 
+                if (path.points.length > 1) ctx.closePath(); 
+                ctx.fill(); 
+            } else { 
+                ctx.stroke(); 
+            }
         });
         ctx.restore();
     }
 
-    function renderOnionSkins(ctx) {
+     function renderOnionSkins(ctx) {
         const activeLayer = getActiveLayer(); 
         if (!activeLayer || activeLayer.paths.length === 0) return;
 
@@ -915,25 +936,40 @@
             ctx.translate(CONFIG.baseSize/2, CONFIG.baseSize/2);
             ctx.rotate(rotation);
             ctx.translate(-CONFIG.baseSize/2, -CONFIG.baseSize/2);
+
             ctx.strokeStyle = color;
             ctx.fillStyle = color;
             ctx.lineWidth = activeLayer.strokeWidth;
-            ctx.lineCap = 'round';
+            ctx.lineCap = 'round'; // 关键
             ctx.lineJoin = 'round';
+
+            ctx.beginPath(); 
+            
             activeLayer.paths.forEach(path => {
                 if (path.points.length < 1) return;
-                ctx.beginPath();
+                
                 ctx.moveTo(path.points[0].x, path.points[0].y);
-                for (let i = 1; i < path.points.length; i++) {
-                    ctx.lineTo(path.points[i].x, path.points[i].y);
+                
+                // --- 修改开始：处理单点洋葱皮 ---
+                if (path.points.length === 1) {
+                    ctx.lineTo(path.points[0].x, path.points[0].y);
+                } else {
+                    for (let i = 1; i < path.points.length; i++) {
+                        ctx.lineTo(path.points[i].x, path.points[i].y);
+                    }
                 }
-                if (activeLayer.mode === 'fill') { 
-                    if (path.points.length > 1) ctx.closePath(); 
-                    ctx.fill(); 
-                } else { 
-                    ctx.stroke(); 
+                // --- 修改结束 ---
+                
+                if (activeLayer.mode === 'fill' && path.points.length > 1) {
+                    ctx.closePath();
                 }
             });
+
+            if (activeLayer.mode === 'fill') { 
+                ctx.fill(); 
+            } else { 
+                ctx.stroke(); 
+            }
             ctx.restore();
         };
 
@@ -1064,7 +1100,7 @@
     function loadHistory(snapshot) { const data = JSON.parse(snapshot); state.layers = data.layers; state.activeLayerIndex = data.activeLayerIndex; updateUI(); render(); }
     function undo() { if (undoStack.length <= 1) return; redoStack.push(undoStack.pop()); loadHistory(undoStack[undoStack.length-1]); showToast("↪ 撤销"); }
     function redo() { if (redoStack.length === 0) return; const stateToLoad = redoStack.pop(); undoStack.push(stateToLoad); loadHistory(stateToLoad); showToast("↩ 重做"); }
-    function setUnsaved(val) { state.hasUnsavedChanges = val; DOM.statusDot.className = `dot ${val ? 'unsaved' : 'saved'}`; DOM.statusText.innerText = val ? '未保存' : '已保存'; }
+    function setUnsaved(val) { state.hasUnsavedChanges = val; DOM.statusDot.className = `dot ${val ? 'unsaved' : 'saved'}`; DOM.statusText.innerText = val ? '未导出' : '已保存'; }
     function handleDragStart(e) { e.currentTarget.classList.add('dragging'); state.draggedLayerId = parseFloat(e.currentTarget.dataset.layerId); e.dataTransfer.effectAllowed = 'move'; }
     function handleDragOver(e) { e.preventDefault(); const target = e.currentTarget; if (parseFloat(target.dataset.layerId) !== state.draggedLayerId) { target.classList.add('drag-over'); } }
     function handleDrop(e) { e.preventDefault(); const target = e.currentTarget; target.classList.remove('drag-over'); const activeId = getActiveLayer()?.id; const droppedOnId = parseFloat(target.dataset.layerId); const draggedIndex = state.layers.findIndex(l => l.id === state.draggedLayerId); const targetIndex = state.layers.findIndex(l => l.id === droppedOnId); if(draggedIndex === -1 || targetIndex === -1) return; const [draggedLayer] = state.layers.splice(draggedIndex, 1); state.layers.splice(targetIndex, 0, draggedLayer); state.activeLayerIndex = activeId ? state.layers.findIndex(l => l.id === activeId) : 0; saveHistory(); renderLayerList(); }
