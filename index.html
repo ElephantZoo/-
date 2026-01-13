@@ -434,7 +434,7 @@
         drag: { isActive: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 },
         draggedLayerId: null,
         dragStartAngle: 0, dragStartViewRot: 0, cursorWorldX: 0, cursorWorldY: 0, cursorScreenX: 0, cursorScreenY: 0, isCursorInCanvas: false,
-        onionSkins: { enabled: true, showBefore: true, showAfter: true, opacity: 0.5 },
+        onionSkins: { enabled: true, showBefore: true, showAfter: true, opacity: 0.2 },
         onionOnTop: false,
         snapToMidline: true, hasUnsavedChanges: false, dpr: 1, fps: 12,
         isGesturing: false,
@@ -1309,7 +1309,7 @@
                 
                 const duration = Date.now() - touchStartTime;
                 
-                if (duration < 300 && touchTotalMovement < 10) { 
+                if (duration < 500 && touchTotalMovement < 50) { 
                     if (maxTouches === 2) undo(); 
                     else if (maxTouches === 3) redo(); 
                 }
