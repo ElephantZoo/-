@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -226,7 +226,8 @@
         position: relative;
         background-color: #111;
         overflow: hidden;
-        background-image: linear-gradient(45deg, #1a1a1a 25%, transparent 25%),
+        background-image:
+          linear-gradient(45deg, #1a1a1a 25%, transparent 25%),
           linear-gradient(-45deg, #1a1a1a 25%, transparent 25%),
           linear-gradient(45deg, transparent 75%, #1a1a1a 75%),
           linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
@@ -244,12 +245,14 @@
         cursor: grabbing !important;
       }
       .viewport.erasing {
-        cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' stroke='%23e74c3c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2'/></svg>")
+        cursor:
+          url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' stroke='%23e74c3c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2'/></svg>")
             12 12,
           auto !important;
       }
       .viewport.rotating {
-        cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23fff' stroke='%23000' stroke-width='0.5'><path d='M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z'/></svg>")
+        cursor:
+          url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23fff' stroke='%23000' stroke-width='0.5'><path d='M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z'/></svg>")
             12 12,
           grab !important;
       }
@@ -2101,62 +2104,103 @@
         ctx.translate(-cx, -cy);
       }
 
-      function renderLayer(ctx, layer, isExporting = false) {
+      // === 终极修复版 renderLayer 函数 ===
+function renderLayer(ctx, layer, isExporting = false) {
     ctx.save();
-    ctx.globalAlpha = layer.opacity;
-    ctx.strokeStyle = layer.color;
-    ctx.fillStyle = layer.color;
-    ctx.lineWidth = layer.strokeWidth;
+    
+    // 基础样式设置
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-
+    ctx.lineWidth = layer.strokeWidth;
+    
+    // 内部绘制函数
     const drawPaths = () => {
-        // 【关键修改1】在循环外部开启路径
-        // 这意味着图层里的所有笔画现在被视为“同一个复杂的形状”
-        ctx.beginPath();
-
-        layer.paths.forEach(path => {
-            // === 选区变换逻辑 (保持不变) ===
-            const isSelected = state.selection.selectedPathIds.has(path.id);
-            // 如果正在变换中且是选中路径，不渲染原始路径(由renderTransformedSelection负责)
-            // 但如果是导出模式，必须渲染
-            if (state.selection.status === 'transforming' && isSelected && !isExporting) {
-                return;
-            }
-            // ============================
-
-            // === 橡皮擦预览逻辑 (保持不变) ===
-            if (state.isErasing && state.pathsToErase.has(path.id) && !isExporting) return;
-            // ============================
-
-            if (path.points.length < 1) return;
-
-            // 定义子路径
-            ctx.moveTo(path.points[0].x, path.points[0].y);
-            if (path.points.length === 1) {
-                ctx.lineTo(path.points[0].x, path.points[0].y);
-            } else {
-                for (let i = 1; i < path.points.length; i++) {
-                    ctx.lineTo(path.points[i].x, path.points[i].y);
-                }
-            }
-
-            // 如果是填充模式，为了防止形状乱飞，每个笔画还是需要闭合的
-            // 但注意：这里不fill，只是闭合路径线
-            if (layer.mode === 'fill' && path.points.length > 1) {
-                ctx.closePath();
-            }
-        });
-
-        // 【关键修改2】在循环结束后，一次性填充或描边
-        // Canvas 会自动计算所有路径的并集（Non-Zero 规则），然后应用一次透明度
+        // --- 方案 A: 填充模式 (使用离屏缓冲解决破洞+透明度叠加问题) ---
         if (layer.mode === 'fill') {
-            ctx.fill();
-        } else {
+            // 1. 初始化或调整缓冲区大小
+            // 我们挂载在 DOM 对象上以便复用，避免每一帧都创建 Canvas 导致卡顿
+            if (!DOM.bufferCanvas) {
+                DOM.bufferCanvas = document.createElement('canvas');
+                DOM.bufferCtx = DOM.bufferCanvas.getContext('2d');
+            }
+            if (DOM.bufferCanvas.width !== ctx.canvas.width || DOM.bufferCanvas.height !== ctx.canvas.height) {
+                DOM.bufferCanvas.width = ctx.canvas.width;
+                DOM.bufferCanvas.height = ctx.canvas.height;
+            }
+
+            const bCtx = DOM.bufferCtx;
+            
+            // 2. 清空缓冲区
+            bCtx.clearRect(0, 0, bCtx.canvas.width, bCtx.canvas.height);
+
+            // 3. 同步变换矩阵 (关键!)
+            // 我们需要让缓冲区拥有和当前主画布一模一样的旋转/缩放/位移
+            const transform = ctx.getTransform();
+            bCtx.setTransform(transform);
+
+            // 4. 在缓冲区上以 100% 不透明度绘制
+            bCtx.fillStyle = layer.color;
+            bCtx.globalAlpha = 1; // 强制不透明，解决叠加变深问题
+
+            layer.paths.forEach(path => {
+                // 选区和橡皮擦逻辑
+                const isSelected = state.selection.selectedPathIds.has(path.id);
+                if (state.selection.status === 'transforming' && isSelected && !isExporting) return;
+                if (state.isErasing && state.pathsToErase.has(path.id) && !isExporting) return;
+                if (path.points.length < 1) return;
+
+                // 独立绘制每个形状，解决破洞问题 (Painter's Algorithm)
+                bCtx.beginPath();
+                bCtx.moveTo(path.points[0].x, path.points[0].y);
+                if (path.points.length === 1) {
+                    bCtx.lineTo(path.points[0].x, path.points[0].y);
+                } else {
+                    for (let i = 1; i < path.points.length; i++) {
+                        bCtx.lineTo(path.points[i].x, path.points[i].y);
+                    }
+                }
+                bCtx.closePath();
+                bCtx.fill(); 
+            });
+
+            // 5. 将缓冲区内容绘制回主画布
+            // 需要先重置主画布的变换，因为 drawImage 绘制的是整张图，而图里已经包含了变换
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0); 
+            ctx.globalAlpha = layer.opacity; // 在这里应用图层透明度
+            ctx.drawImage(DOM.bufferCanvas, 0, 0);
+            ctx.restore();
+        } 
+        
+        // --- 方案 B: 描边模式 (使用单路径合并解决节点叠加问题) ---
+        else {
+            ctx.strokeStyle = layer.color;
+            ctx.globalAlpha = layer.opacity;
+            ctx.beginPath(); // 开启一个大路径
+
+            layer.paths.forEach(path => {
+                // 选区和橡皮擦逻辑
+                const isSelected = state.selection.selectedPathIds.has(path.id);
+                if (state.selection.status === 'transforming' && isSelected && !isExporting) return;
+                if (state.isErasing && state.pathsToErase.has(path.id) && !isExporting) return;
+                if (path.points.length < 1) return;
+
+                // 只定义线条，不立即绘制
+                ctx.moveTo(path.points[0].x, path.points[0].y);
+                if (path.points.length === 1) {
+                    ctx.lineTo(path.points[0].x, path.points[0].y);
+                } else {
+                    for (let i = 1; i < path.points.length; i++) {
+                        ctx.lineTo(path.points[i].x, path.points[i].y);
+                    }
+                }
+            });
+            // 一次性描边，接口处完美融合
             ctx.stroke();
         }
     };
 
+    // 草稿图层与普通图层的渲染分发逻辑
     if (layer.type === 'draft') {
         const count = state.sliceCount;
         const step = (360 / count) * Math.PI / 180;
@@ -2179,70 +2223,125 @@
 }
 
       // === 修复后的 renderOnionSkins 函数 ===
+      // === 修复洋葱皮破洞问题的 renderOnionSkins 函数 ===
 function renderOnionSkins(ctx) {
     const activeLayer = getActiveLayer();
     if (!activeLayer || activeLayer.paths.length === 0) return;
     if (activeLayer.type === 'draft') return;
 
+    // 1. 初始化或调整缓冲区 (复用 renderLayer 创建的 buffer)
+    if (!DOM.bufferCanvas) {
+        DOM.bufferCanvas = document.createElement('canvas');
+        DOM.bufferCtx = DOM.bufferCanvas.getContext('2d');
+    }
+    if (DOM.bufferCanvas.width !== ctx.canvas.width || DOM.bufferCanvas.height !== ctx.canvas.height) {
+        DOM.bufferCanvas.width = ctx.canvas.width;
+        DOM.bufferCanvas.height = ctx.canvas.height;
+    }
+    const bCtx = DOM.bufferCtx;
+
     const step = 360 / state.sliceCount * Math.PI / 180;
 
-    const drawVectorOnion = (rotation, color) => {
-        ctx.save();
-        ctx.globalAlpha = state.onionSkins.opacity;
-        ctx.translate(CONFIG.baseSize / 2, CONFIG.baseSize / 2);
-        ctx.rotate(rotation);
-        ctx.translate(-CONFIG.baseSize / 2, -CONFIG.baseSize / 2);
-        ctx.strokeStyle = color;
-        ctx.fillStyle = color;
-        ctx.lineWidth = activeLayer.strokeWidth;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        // 1. 在循环之前开启路径 (只开启一次)
-        ctx.beginPath();
-
-        activeLayer.paths.forEach(path => {
-            // === 保持你的选区变换逻辑不变 ===
-            let pointsToDraw;
-            const isSelectedAndTransforming = 
-                state.selection.status === 'transforming' && 
-                state.selection.selectedPathIds.has(path.id);
-
-            if (isSelectedAndTransforming) {
-                const originalPath = state.selection.originalPaths.get(path.id);
-                if (!originalPath) return;
-                pointsToDraw = originalPath.points.map(p => 
-                    transformPoint(p, state.selection.bbox, state.selection.transform)
-                );
-            } else {
-                pointsToDraw = path.points;
-            }
-            // ================================
-
-            if (pointsToDraw.length < 1) return;
-
-            // 绘制子路径
-            ctx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
-            for (let i = 1; i < pointsToDraw.length; i++) {
-                ctx.lineTo(pointsToDraw[i].x, pointsToDraw[i].y);
-            }
-
-            // 如果是填充模式，需要闭合每一个子路径，防止形状混乱
-            // 但不要在这里 fill，只是定义形状
-            if (activeLayer.mode === 'fill' && pointsToDraw.length > 1) {
-                ctx.closePath();
-            }
-        });
-
-        // 2. 在循环结束后，一次性进行填充或描边
-        // 这样透明度会应用在整个合并后的形状上，重叠部分不会变深
+    const drawVectorOnion = (offsetRotation, color) => {
+        // --- 方案 A: 填充模式 (使用离屏缓冲) ---
         if (activeLayer.mode === 'fill') {
-            ctx.fill();
-        } else {
-            ctx.stroke();
-        }
+            // A1. 清空缓冲区
+            bCtx.clearRect(0, 0, bCtx.canvas.width, bCtx.canvas.height);
 
-        ctx.restore();
+            // A2. 同步变换矩阵
+            // 我们需要让缓冲区拥有和当前主画布一模一样的 缩放/位移
+            bCtx.save();
+            const currentTransform = ctx.getTransform();
+            bCtx.setTransform(currentTransform);
+
+            // A3. 应用洋葱皮特有的旋转偏移
+            bCtx.translate(CONFIG.baseSize / 2, CONFIG.baseSize / 2);
+            bCtx.rotate(offsetRotation);
+            bCtx.translate(-CONFIG.baseSize / 2, -CONFIG.baseSize / 2);
+
+            // A4. 设置绘制样式 (强制不透明)
+            bCtx.fillStyle = color;
+            bCtx.globalAlpha = 1; 
+
+            // A5. 逐个绘制路径 (解决破洞)
+            activeLayer.paths.forEach(path => {
+                // 处理选区变换
+                let pointsToDraw = path.points;
+                const isSelectedAndTransforming = 
+                    state.selection.status === 'transforming' && 
+                    state.selection.selectedPathIds.has(path.id);
+
+                if (isSelectedAndTransforming) {
+                    const originalPath = state.selection.originalPaths.get(path.id);
+                    if (originalPath) {
+                        pointsToDraw = originalPath.points.map(p => 
+                            transformPoint(p, state.selection.bbox, state.selection.transform)
+                        );
+                    }
+                }
+
+                if (pointsToDraw.length < 1) return;
+
+                bCtx.beginPath();
+                bCtx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
+                for (let i = 1; i < pointsToDraw.length; i++) {
+                    bCtx.lineTo(pointsToDraw[i].x, pointsToDraw[i].y);
+                }
+                bCtx.closePath();
+                bCtx.fill();
+            });
+            bCtx.restore(); // 恢复 buffer 的变换状态
+
+            // A6. 将缓冲区绘制回主画布
+            ctx.save();
+            // 重置主画布变换，因为 buffer 已经是全屏图像了
+            ctx.setTransform(1, 0, 0, 1, 0, 0); 
+            ctx.globalAlpha = state.onionSkins.opacity; // 应用洋葱皮透明度
+            ctx.drawImage(DOM.bufferCanvas, 0, 0);
+            ctx.restore();
+        } 
+        // --- 方案 B: 描边模式 (使用合并路径) ---
+        else {
+            ctx.save();
+            ctx.globalAlpha = state.onionSkins.opacity;
+            
+            // 应用洋葱皮旋转
+            ctx.translate(CONFIG.baseSize / 2, CONFIG.baseSize / 2);
+            ctx.rotate(offsetRotation);
+            ctx.translate(-CONFIG.baseSize / 2, -CONFIG.baseSize / 2);
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = activeLayer.strokeWidth;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // 开启大路径，一次性描边 (解决叠加变深，且无破洞问题)
+            ctx.beginPath();
+            activeLayer.paths.forEach(path => {
+                // 处理选区变换
+                let pointsToDraw = path.points;
+                const isSelectedAndTransforming = 
+                    state.selection.status === 'transforming' && 
+                    state.selection.selectedPathIds.has(path.id);
+
+                if (isSelectedAndTransforming) {
+                    const originalPath = state.selection.originalPaths.get(path.id);
+                    if (originalPath) {
+                        pointsToDraw = originalPath.points.map(p => 
+                            transformPoint(p, state.selection.bbox, state.selection.transform)
+                        );
+                    }
+                }
+
+                if (pointsToDraw.length < 1) return;
+                ctx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
+                for (let i = 1; i < pointsToDraw.length; i++) {
+                    ctx.lineTo(pointsToDraw[i].x, pointsToDraw[i].y);
+                }
+            });
+            ctx.stroke();
+            ctx.restore();
+        }
     };
 
     if (state.onionSkins.showBefore) drawVectorOnion(-step * state.rotDirection, '#ff0000');
@@ -3702,7 +3801,7 @@ function renderOnionSkins(ctx) {
         render();
       }
 
-     // ==================================================================
+      // ==================================================================
       // === SELECTION SYSTEM START (REPLACEMENT BLOCK) ===================
       // ==================================================================
 
@@ -3710,9 +3809,12 @@ function renderOnionSkins(ctx) {
         const { x, y } = point;
         let inside = false;
         for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-          const xi = vs[i].x, yi = vs[i].y;
-          const xj = vs[j].x, yj = vs[j].y;
-          const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+          const xi = vs[i].x,
+            yi = vs[i].y;
+          const xj = vs[j].x,
+            yj = vs[j].y;
+          const intersect =
+            yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
           if (intersect) inside = !inside;
         }
         return inside;
@@ -3720,67 +3822,72 @@ function renderOnionSkins(ctx) {
 
       // === 将原有的 calculateBBox 替换为以下代码 ===
 
-// === 修改 calculateBBox ===
-// 修复：加入线条粗细(Stroke Width)计算，确保粗线也能被完美框住
-function calculateBBox(pathIds) {
-  const layer = getActiveLayer();
-  if (!layer) return null;
+      // === 修改 calculateBBox ===
+      // 修复：加入线条粗细(Stroke Width)计算，确保粗线也能被完美框住
+      function calculateBBox(pathIds) {
+        const layer = getActiveLayer();
+        if (!layer) return null;
 
-  const angleDeg = state.viewRotation || 0;
-  const rad = -(angleDeg * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
+        const angleDeg = state.viewRotation || 0;
+        const rad = -(angleDeg * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
 
-  let minRx = Infinity, minRy = Infinity, maxRx = -Infinity, maxRy = -Infinity;
-  let hasPoints = false;
+        let minRx = Infinity,
+          minRy = Infinity,
+          maxRx = -Infinity,
+          maxRy = -Infinity;
+        let hasPoints = false;
 
-  pathIds.forEach((id) => {
-    const path = layer.paths.find((p) => p.id === id);
-    if (path) {
-      path.points.forEach((p) => {
-        hasPoints = true;
-        const rx = p.x * cos - p.y * sin;
-        const ry = p.x * sin + p.y * cos;
-        minRx = Math.min(minRx, rx);
-        minRy = Math.min(minRy, ry);
-        maxRx = Math.max(maxRx, rx);
-        maxRy = Math.max(maxRy, ry);
-      });
-    }
-  });
+        pathIds.forEach((id) => {
+          const path = layer.paths.find((p) => p.id === id);
+          if (path) {
+            path.points.forEach((p) => {
+              hasPoints = true;
+              const rx = p.x * cos - p.y * sin;
+              const ry = p.x * sin + p.y * cos;
+              minRx = Math.min(minRx, rx);
+              minRy = Math.min(minRy, ry);
+              maxRx = Math.max(maxRx, rx);
+              maxRy = Math.max(maxRy, ry);
+            });
+          }
+        });
 
-  if (!hasPoints) return null;
+        if (!hasPoints) return null;
 
-  // === 核心修复在这里 ===
-  // 获取画笔半径，作为额外的扩充距离
-  // 还要加上一点点(PADDING)作为视觉缓冲
-  const halfStroke = (layer.strokeWidth || 1) / 2;
-  const PADDING = 5 + halfStroke; 
-  
-  minRx -= PADDING; minRy -= PADDING;
-  maxRx += PADDING; maxRy += PADDING;
+        // === 核心修复在这里 ===
+        // 获取画笔半径，作为额外的扩充距离
+        // 还要加上一点点(PADDING)作为视觉缓冲
+        const halfStroke = (layer.strokeWidth || 1) / 2;
+        const PADDING = 5 + halfStroke;
 
-  const width = maxRx - minRx;
-  const height = maxRy - minRy;
+        minRx -= PADDING;
+        minRy -= PADDING;
+        maxRx += PADDING;
+        maxRy += PADDING;
 
-  const centerRx = minRx + width / 2;
-  const centerRy = minRy + height / 2;
+        const width = maxRx - minRx;
+        const height = maxRy - minRy;
 
-  const invCos = Math.cos(-rad);
-  const invSin = Math.sin(-rad);
-  
-  const cx = centerRx * invCos - centerRy * invSin;
-  const cy = centerRx * invSin + centerRy * invCos;
+        const centerRx = minRx + width / 2;
+        const centerRy = minRy + height / 2;
 
-  return { 
-    minX: cx - width / 2, 
-    minY: cy - height / 2, 
-    width, 
-    height, 
-    cx, 
-    cy 
-  };
-}
+        const invCos = Math.cos(-rad);
+        const invSin = Math.sin(-rad);
+
+        const cx = centerRx * invCos - centerRy * invSin;
+        const cy = centerRx * invSin + centerRy * invCos;
+
+        return {
+          minX: cx - width / 2,
+          minY: cy - height / 2,
+          width,
+          height,
+          cx,
+          cy,
+        };
+      }
       function resetSelection() {
         state.selection = {
           ...state.selection,
@@ -3798,85 +3905,104 @@ function calculateBBox(pathIds) {
 
       // === 将原有的 enterTransformMode 替换为以下代码 ===
 
-function enterTransformMode() {
-  const { selectedPathIds } = state.selection;
-  const layer = getActiveLayer();
-  if (selectedPathIds.size === 0 || !layer) {
-    showToast("未选中内容");
-    return resetSelection();
-  }
+      function enterTransformMode() {
+        const { selectedPathIds } = state.selection;
+        const layer = getActiveLayer();
+        if (selectedPathIds.size === 0 || !layer) {
+          showToast("未选中内容");
+          return resetSelection();
+        }
 
-  const bbox = calculateBBox(selectedPathIds);
-  if (!bbox) return resetSelection();
+        const bbox = calculateBBox(selectedPathIds);
+        if (!bbox) return resetSelection();
 
-  state.selection.status = "transforming";
-  state.selection.bbox = bbox;
-  state.selection.originalPaths.clear();
-  selectedPathIds.forEach((id) => {
-    const path = layer.paths.find((p) => p.id === id);
-    if (path) {
-      state.selection.originalPaths.set(id, JSON.parse(JSON.stringify(path)));
-    }
-  });
+        state.selection.status = "transforming";
+        state.selection.bbox = bbox;
+        state.selection.originalPaths.clear();
+        selectedPathIds.forEach((id) => {
+          const path = layer.paths.find((p) => p.id === id);
+          if (path) {
+            state.selection.originalPaths.set(
+              id,
+              JSON.parse(JSON.stringify(path))
+            );
+          }
+        });
 
-  // === 核心修改在这里 ===
-  // 初始 rotation 设置为 -state.viewRotation
-  // 这样包围盒会被反向旋转，从而在视觉上与屏幕边缘平行
-  state.selection.transform = { 
-    x: 0, 
-    y: 0, 
-    scaleX: 1, 
-    scaleY: 1, 
-    rotation: -state.viewRotation 
-  };
-  
-  updateUI();
-  render();
-}
-      
+        // === 核心修改在这里 ===
+        // 初始 rotation 设置为 -state.viewRotation
+        // 这样包围盒会被反向旋转，从而在视觉上与屏幕边缘平行
+        state.selection.transform = {
+          x: 0,
+          y: 0,
+          scaleX: 1,
+          scaleY: 1,
+          rotation: -state.viewRotation,
+        };
+
+        updateUI();
+        render();
+      }
+
       function commitCurrentTransform() {
-        if (state.selection.status !== 'transforming' || !state.selection.bbox) return;
-        const { originalPaths, bbox, transform, selectedPathIds } = state.selection;
+        if (state.selection.status !== "transforming" || !state.selection.bbox)
+          return;
+        const { originalPaths, bbox, transform, selectedPathIds } =
+          state.selection;
         const layer = getActiveLayer();
         if (!layer) return;
 
         // Apply the current temporary transform to the layer's actual path data
-        selectedPathIds.forEach(id => {
-            const pathInLayer = layer.paths.find(p => p.id === id);
-            const originalPath = originalPaths.get(id);
-            if (pathInLayer && originalPath) {
-                pathInLayer.points = originalPath.points.map(p => transformPoint(p, bbox, transform));
-            }
+        selectedPathIds.forEach((id) => {
+          const pathInLayer = layer.paths.find((p) => p.id === id);
+          const originalPath = originalPaths.get(id);
+          if (pathInLayer && originalPath) {
+            pathInLayer.points = originalPath.points.map((p) =>
+              transformPoint(p, bbox, transform)
+            );
+          }
         });
 
         // Now, update the "original" state to be this newly committed state
         const newBbox = calculateBBox(selectedPathIds);
         state.selection.originalPaths.clear();
-        selectedPathIds.forEach(id => {
-            const path = layer.paths.find(p => p.id === id);
-            if (path) {
-                state.selection.originalPaths.set(id, JSON.parse(JSON.stringify(path)));
-            }
+        selectedPathIds.forEach((id) => {
+          const path = layer.paths.find((p) => p.id === id);
+          if (path) {
+            state.selection.originalPaths.set(
+              id,
+              JSON.parse(JSON.stringify(path))
+            );
+          }
         });
         state.selection.bbox = newBbox;
-        
+
         // IMPORTANT: Reset the temporary transform state, ready for the next drag operation
-        state.selection.transform = { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 };
+        state.selection.transform = {
+          x: 0,
+          y: 0,
+          scaleX: 1,
+          scaleY: 1,
+          rotation: 0,
+        };
       }
 
       function confirmSelection() {
         if (state.selection.status !== "transforming") return;
-        
+
         // ▼▼▼ 新增的核心逻辑：应用变换 ▼▼▼
-        const { originalPaths, bbox, transform, selectedPathIds } = state.selection;
+        const { originalPaths, bbox, transform, selectedPathIds } =
+          state.selection;
         const layer = getActiveLayer();
         if (layer) {
-          selectedPathIds.forEach(id => {
-            const pathInLayer = layer.paths.find(p => p.id === id);
+          selectedPathIds.forEach((id) => {
+            const pathInLayer = layer.paths.find((p) => p.id === id);
             const originalPath = originalPaths.get(id); // 获取进入变换前的原始路径
             if (pathInLayer && originalPath) {
               // 应用最终的变换并更新图层数据
-              pathInLayer.points = originalPath.points.map(p => transformPoint(p, bbox, transform));
+              pathInLayer.points = originalPath.points.map((p) =>
+                transformPoint(p, bbox, transform)
+              );
             }
           });
           saveHistory(); // 保存历史记录
@@ -3886,21 +4012,21 @@ function enterTransformMode() {
         resetSelection();
         DOM.viewport.style.cursor = "crosshair";
       }
-      
+
       function cancelSelection() {
-        if (state.selection.status === 'none') return;
+        if (state.selection.status === "none") return;
 
         // Revert to the state before the transform session started
         const { originalPaths, selectedPathIds } = state.selection;
         const layer = getActiveLayer();
         if (layer) {
-            selectedPathIds.forEach(id => {
-                const pathInLayer = layer.paths.find(p => p.id === id);
-                const originalPath = originalPaths.get(id);
-                if(pathInLayer && originalPath) {
-                    pathInLayer.points = originalPath.points;
-                }
-            });
+          selectedPathIds.forEach((id) => {
+            const pathInLayer = layer.paths.find((p) => p.id === id);
+            const originalPath = originalPaths.get(id);
+            if (pathInLayer && originalPath) {
+              pathInLayer.points = originalPath.points;
+            }
+          });
         }
 
         resetSelection();
@@ -3910,7 +4036,8 @@ function enterTransformMode() {
       function copySelection() {
         if (state.selection.status !== "transforming") return;
 
-        const { originalPaths, bbox, transform, selectedPathIds } = state.selection;
+        const { originalPaths, bbox, transform, selectedPathIds } =
+          state.selection;
         const layer = getActiveLayer();
         if (!layer) return;
 
@@ -3920,33 +4047,34 @@ function enterTransformMode() {
         const offset = { x: 20 / state.zoom, y: 20 / state.zoom }; // 副本的偏移量
 
         originalPaths.forEach((originalPath, id) => {
-            if (selectedPathIds.has(id)) { // 确保只复制当前选中的
-                const newPath = JSON.parse(JSON.stringify(originalPath)); // 深拷贝原始路径结构
-                newPath.id = Date.now() + Math.random();
-                
-                // 计算变换后的点，并额外加上偏移量
-                newPath.points = originalPath.points.map(p => {
-                    const transformedPoint = transformPoint(p, bbox, transform);
-                    return {
-                        x: transformedPoint.x + offset.x,
-                        y: transformedPoint.y + offset.y
-                    };
-                });
+          if (selectedPathIds.has(id)) {
+            // 确保只复制当前选中的
+            const newPath = JSON.parse(JSON.stringify(originalPath)); // 深拷贝原始路径结构
+            newPath.id = Date.now() + Math.random();
 
-                newPaths.push(newPath);
-                newPathIds.add(newPath.id);
-            }
+            // 计算变换后的点，并额外加上偏移量
+            newPath.points = originalPath.points.map((p) => {
+              const transformedPoint = transformPoint(p, bbox, transform);
+              return {
+                x: transformedPoint.x + offset.x,
+                y: transformedPoint.y + offset.y,
+              };
+            });
+
+            newPaths.push(newPath);
+            newPathIds.add(newPath.id);
+          }
         });
         // ▲▲▲ 核心逻辑结束 ▲▲▲
 
         if (newPaths.length > 0) {
-            layer.paths.push(...newPaths);
-            saveHistory();
+          layer.paths.push(...newPaths);
+          saveHistory();
 
-            // 可选：让新创建的副本成为当前选区，以便连续复制
-            confirmSelection(); // 先确认并取消当前的选区
-            state.selection.selectedPathIds = newPathIds; // 然后选中新的
-            enterTransformMode(); // 进入新的变换模式
+          // 可选：让新创建的副本成为当前选区，以便连续复制
+          confirmSelection(); // 先确认并取消当前的选区
+          state.selection.selectedPathIds = newPathIds; // 然后选中新的
+          enterTransformMode(); // 进入新的变换模式
         }
       }
 
@@ -3972,103 +4100,120 @@ function enterTransformMode() {
       }
 
       // === 修改 handleSelectionPointerMove ===
-// 修复：缩放逻辑重写，采用“锚点固定法”，确保对角点纹丝不动
-function handleSelectionPointerMove(e) {
-  const s = state.selection;
-  const worldPos = getScreenToWorldPos(e.clientX, e.clientY);
+      // 修复：缩放逻辑重写，采用“锚点固定法”，确保对角点纹丝不动
+      function handleSelectionPointerMove(e) {
+        const s = state.selection;
+        const worldPos = getScreenToWorldPos(e.clientX, e.clientY);
 
-  if (s.status === "selecting" && e.buttons & 1) {
-    s.lassoPath.push(worldPos);
-    render();
-    return;
-  }
+        if (s.status === "selecting" && e.buttons & 1) {
+          s.lassoPath.push(worldPos);
+          render();
+          return;
+        }
 
-  if (s.status === "transforming") {
-    if (s.activeControl && e.buttons & 1) {
-      // 移动模式逻辑保持不变
-      if (s.activeControl === "move") {
-        const startTransform = s.dragStart.transform;
-        const dx = worldPos.x - s.dragStart.x;
-        const dy = worldPos.y - s.dragStart.y;
-        s.transform.x = startTransform.x + dx;
-        s.transform.y = startTransform.y + dy;
-      } 
-      // 旋转模式逻辑保持不变
-      else if (s.activeControl === 'rotate') {
-        const startTransform = s.dragStart.transform;
-        const pivot = { cx: s.bbox.cx + startTransform.x, cy: s.bbox.cy + startTransform.y };
-        const startAngle = Math.atan2(s.dragStart.y - pivot.cy, s.dragStart.x - pivot.cx);
-        const currentAngle = Math.atan2(worldPos.y - pivot.cy, worldPos.x - pivot.cx);
-        s.transform.rotation = startTransform.rotation + (currentAngle - startAngle) * 180 / Math.PI;
-      } 
-      // === 核心修复：缩放逻辑 ===
-      else { 
-        // 1. 定义控制点的符号 (左/上 为 -1, 右/下 为 1)
-        const signX = s.activeControl.includes('l') ? -1 : 1;
-        const signY = s.activeControl.includes('t') ? -1 : 1;
+        if (s.status === "transforming") {
+          if (s.activeControl && e.buttons & 1) {
+            // 移动模式逻辑保持不变
+            if (s.activeControl === "move") {
+              const startTransform = s.dragStart.transform;
+              const dx = worldPos.x - s.dragStart.x;
+              const dy = worldPos.y - s.dragStart.y;
+              s.transform.x = startTransform.x + dx;
+              s.transform.y = startTransform.y + dy;
+            }
+            // 旋转模式逻辑保持不变
+            else if (s.activeControl === "rotate") {
+              const startTransform = s.dragStart.transform;
+              const pivot = {
+                cx: s.bbox.cx + startTransform.x,
+                cy: s.bbox.cy + startTransform.y,
+              };
+              const startAngle = Math.atan2(
+                s.dragStart.y - pivot.cy,
+                s.dragStart.x - pivot.cx
+              );
+              const currentAngle = Math.atan2(
+                worldPos.y - pivot.cy,
+                worldPos.x - pivot.cx
+              );
+              s.transform.rotation =
+                startTransform.rotation +
+                ((currentAngle - startAngle) * 180) / Math.PI;
+            }
+            // === 核心修复：缩放逻辑 ===
+            else {
+              // 1. 定义控制点的符号 (左/上 为 -1, 右/下 为 1)
+              const signX = s.activeControl.includes("l") ? -1 : 1;
+              const signY = s.activeControl.includes("t") ? -1 : 1;
 
-        // 2. 计算“对角锚点” (Anchor) 的世界坐标
-        // 我们利用上一次(拖拽开始时)的变换状态来计算锚点的绝对位置，因为锚点是不动的
-        const startTransform = s.dragStart.transform;
-        
-        // 获取包围盒的一半宽高
-        const halfW = s.bbox.width / 2;
-        const halfH = s.bbox.height / 2;
+              // 2. 计算“对角锚点” (Anchor) 的世界坐标
+              // 我们利用上一次(拖拽开始时)的变换状态来计算锚点的绝对位置，因为锚点是不动的
+              const startTransform = s.dragStart.transform;
 
-        // 锚点在局部坐标系的位置 (与当前拖拽点相反)
-        // 例如：拖拽 tl(-1, -1)，锚点就是 br(1, 1)
-        const anchorLocalX = -signX * halfW;
-        const anchorLocalY = -signY * halfH;
+              // 获取包围盒的一半宽高
+              const halfW = s.bbox.width / 2;
+              const halfH = s.bbox.height / 2;
 
-        // 将锚点转为世界坐标
-        const rad = (startTransform.rotation * Math.PI) / 180;
-        const cos = Math.cos(rad);
-        const sin = Math.sin(rad);
+              // 锚点在局部坐标系的位置 (与当前拖拽点相反)
+              // 例如：拖拽 tl(-1, -1)，锚点就是 br(1, 1)
+              const anchorLocalX = -signX * halfW;
+              const anchorLocalY = -signY * halfH;
 
-        // 应用缩放
-        const scaledAnchorX = anchorLocalX * startTransform.scaleX;
-        const scaledAnchorY = anchorLocalY * startTransform.scaleY;
+              // 将锚点转为世界坐标
+              const rad = (startTransform.rotation * Math.PI) / 180;
+              const cos = Math.cos(rad);
+              const sin = Math.sin(rad);
 
-        // 应用旋转并加上中心位移
-        const anchorWorldX = s.bbox.cx + startTransform.x + (scaledAnchorX * cos - scaledAnchorY * sin);
-        const anchorWorldY = s.bbox.cy + startTransform.y + (scaledAnchorX * sin + scaledAnchorY * cos);
+              // 应用缩放
+              const scaledAnchorX = anchorLocalX * startTransform.scaleX;
+              const scaledAnchorY = anchorLocalY * startTransform.scaleY;
 
-        // 3. 计算“新中心点” (New Center)
-        // 新的中心点必然是 锚点 和 鼠标当前位置 的中点
-        const newCenterX = (anchorWorldX + worldPos.x) / 2;
-        const newCenterY = (anchorWorldY + worldPos.y) / 2;
+              // 应用旋转并加上中心位移
+              const anchorWorldX =
+                s.bbox.cx +
+                startTransform.x +
+                (scaledAnchorX * cos - scaledAnchorY * sin);
+              const anchorWorldY =
+                s.bbox.cy +
+                startTransform.y +
+                (scaledAnchorX * sin + scaledAnchorY * cos);
 
-        // 4. 计算新的全长向量 (从锚点指向鼠标)
-        const diagDx = worldPos.x - anchorWorldX;
-        const diagDy = worldPos.y - anchorWorldY;
+              // 3. 计算“新中心点” (New Center)
+              // 新的中心点必然是 锚点 和 鼠标当前位置 的中点
+              const newCenterX = (anchorWorldX + worldPos.x) / 2;
+              const newCenterY = (anchorWorldY + worldPos.y) / 2;
 
-        // 5. 将该向量“反向旋转”，使其平行于包围盒的轴，以便提取宽高
-        // 注意：这里使用当前的旋转角度
-        const unrotatedDx = diagDx * cos + diagDy * sin;
-        const unrotatedDy = -diagDx * sin + diagDy * cos;
+              // 4. 计算新的全长向量 (从锚点指向鼠标)
+              const diagDx = worldPos.x - anchorWorldX;
+              const diagDy = worldPos.y - anchorWorldY;
 
-        // 6. 计算新的 Scale
-        // 新的 Scale = (反向旋转后的长度) / (原始包围盒长度 * 符号)
-        // 符号很重要：如果我在拖拽左边(sign=-1)，向量也是指向左边(负)，负负得正，缩放为正。
-        // 如果拖拽到了右边(翻转)，向量变正，结果变负，实现翻转效果。
-        let newScaleX = unrotatedDx / (s.bbox.width * signX);
-        let newScaleY = unrotatedDy / (s.bbox.height * signY);
+              // 5. 将该向量“反向旋转”，使其平行于包围盒的轴，以便提取宽高
+              // 注意：这里使用当前的旋转角度
+              const unrotatedDx = diagDx * cos + diagDy * sin;
+              const unrotatedDy = -diagDx * sin + diagDy * cos;
 
-        // 7. 处理等比缩放 (Shift键 或 锁定按钮)
-        if (s.isUniform) {
-          // 取绝对值较大的那个比例，保持形状
-          const absScaleX = Math.abs(newScaleX);
-          const absScaleY = Math.abs(newScaleY);
-          const maxScale = Math.max(absScaleX, absScaleY);
-          newScaleX = (newScaleX < 0 ? -1 : 1) * maxScale;
-          newScaleY = (newScaleY < 0 ? -1 : 1) * maxScale;
-          
-          // 等比缩放时，中心点需要重新基于修正后的长度计算
-          // (因为上面简单的中点计算假设了X和Y可以自由伸缩)
-          // 这里为了代码简洁，微小的中心点偏移通常可以忽略，
-          // 或者使用更复杂的几何修正。鉴于Web交互，上述中点法在视觉上通常足够，
-          // 但若要精确修正：
-          /*
+              // 6. 计算新的 Scale
+              // 新的 Scale = (反向旋转后的长度) / (原始包围盒长度 * 符号)
+              // 符号很重要：如果我在拖拽左边(sign=-1)，向量也是指向左边(负)，负负得正，缩放为正。
+              // 如果拖拽到了右边(翻转)，向量变正，结果变负，实现翻转效果。
+              let newScaleX = unrotatedDx / (s.bbox.width * signX);
+              let newScaleY = unrotatedDy / (s.bbox.height * signY);
+
+              // 7. 处理等比缩放 (Shift键 或 锁定按钮)
+              if (s.isUniform) {
+                // 取绝对值较大的那个比例，保持形状
+                const absScaleX = Math.abs(newScaleX);
+                const absScaleY = Math.abs(newScaleY);
+                const maxScale = Math.max(absScaleX, absScaleY);
+                newScaleX = (newScaleX < 0 ? -1 : 1) * maxScale;
+                newScaleY = (newScaleY < 0 ? -1 : 1) * maxScale;
+
+                // 等比缩放时，中心点需要重新基于修正后的长度计算
+                // (因为上面简单的中点计算假设了X和Y可以自由伸缩)
+                // 这里为了代码简洁，微小的中心点偏移通常可以忽略，
+                // 或者使用更复杂的几何修正。鉴于Web交互，上述中点法在视觉上通常足够，
+                // 但若要精确修正：
+                /*
           const correctedDx = newScaleX * s.bbox.width * signX;
           const correctedDy = newScaleY * s.bbox.height * signY;
           // 重新旋转回世界坐标
@@ -4077,26 +4222,26 @@ function handleSelectionPointerMove(e) {
           newCenterX = anchorWorldX + finalDx / 2;
           newCenterY = anchorWorldY + finalDy / 2;
           */
-        }
+              }
 
-        // 8. 应用结果
-        s.transform.scaleX = newScaleX;
-        s.transform.scaleY = newScaleY;
-        s.transform.x = newCenterX - s.bbox.cx;
-        s.transform.y = newCenterY - s.bbox.cy;
+              // 8. 应用结果
+              s.transform.scaleX = newScaleX;
+              s.transform.scaleY = newScaleY;
+              s.transform.x = newCenterX - s.bbox.cx;
+              s.transform.y = newCenterY - s.bbox.cy;
+            }
+            render();
+          } else {
+            // 鼠标悬停样式逻辑 (保持不变)
+            const handle = getHandleAtPos(worldPos);
+            if (handle === "move") DOM.viewport.style.cursor = "move";
+            else if (handle === "rotate")
+              DOM.viewport.style.cursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23fff' stroke='%23000' stroke-width='0.5'><path d='M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97-.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z'/></svg>") 12 12, auto`;
+            else if (handle) DOM.viewport.style.cursor = "nwse-resize";
+            else DOM.viewport.style.cursor = "crosshair";
+          }
+        }
       }
-      render();
-      
-    } else {
-      // 鼠标悬停样式逻辑 (保持不变)
-      const handle = getHandleAtPos(worldPos);
-      if (handle === "move") DOM.viewport.style.cursor = "move";
-      else if (handle === 'rotate') DOM.viewport.style.cursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23fff' stroke='%23000' stroke-width='0.5'><path d='M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97-.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z'/></svg>") 12 12, auto`;
-      else if (handle) DOM.viewport.style.cursor = "nwse-resize";
-      else DOM.viewport.style.cursor = "crosshair";
-    }
-  }
-}
 
       function handleSelectionPointerUp(e) {
         const s = state.selection;
@@ -4136,51 +4281,57 @@ function handleSelectionPointerMove(e) {
         ctx.lineWidth = 1 / state.zoom;
         ctx.setLineDash([4 / state.zoom, 4 / state.zoom]);
         ctx.beginPath();
-        ctx.moveTo(state.selection.lassoPath[0].x, state.selection.lassoPath[0].y);
+        ctx.moveTo(
+          state.selection.lassoPath[0].x,
+          state.selection.lassoPath[0].y
+        );
         for (let i = 1; i < state.selection.lassoPath.length; i++) {
-          ctx.lineTo(state.selection.lassoPath[i].x, state.selection.lassoPath[i].y);
+          ctx.lineTo(
+            state.selection.lassoPath[i].x,
+            state.selection.lassoPath[i].y
+          );
         }
         ctx.stroke();
         ctx.restore();
       }
 
       // === 修改 transformPoint ===
-// 核心逻辑：先将世界坐标的点，投影到“正向”的包围盒局部坐标系中，缩放后，再应用变换旋转
-function transformPoint(p, bbox, transform) {
-  const { cx, cy } = bbox;
-  const { x, y, scaleX, scaleY, rotation } = transform;
+      // 核心逻辑：先将世界坐标的点，投影到“正向”的包围盒局部坐标系中，缩放后，再应用变换旋转
+      function transformPoint(p, bbox, transform) {
+        const { cx, cy } = bbox;
+        const { x, y, scaleX, scaleY, rotation } = transform;
 
-  // 1. 计算相对于中心的向量（此时还是世界坐标方向）
-  let px = p.x - cx;
-  let py = p.y - cy;
+        // 1. 计算相对于中心的向量（此时还是世界坐标方向）
+        let px = p.x - cx;
+        let py = p.y - cy;
 
-  // 2. 【关键修正】将向量旋转 ViewRotation 角度
-  // 这样就把“世界方向”的点，对齐到了“选框局部方向”（即屏幕方向）
-  // 否则后续的 scaleX 缩放会沿着错误的方向（世界X轴）进行，而不是沿着选框宽边进行
-  const viewRad = (state.viewRotation * Math.PI) / 180;
-  const cosV = Math.cos(viewRad);
-  const sinV = Math.sin(viewRad);
+        // 2. 【关键修正】将向量旋转 ViewRotation 角度
+        // 这样就把“世界方向”的点，对齐到了“选框局部方向”（即屏幕方向）
+        // 否则后续的 scaleX 缩放会沿着错误的方向（世界X轴）进行，而不是沿着选框宽边进行
+        const viewRad = (state.viewRotation * Math.PI) / 180;
+        const cosV = Math.cos(viewRad);
+        const sinV = Math.sin(viewRad);
 
-  const localX = px * cosV - py * sinV;
-  const localY = px * sinV + py * cosV;
+        const localX = px * cosV - py * sinV;
+        const localY = px * sinV + py * cosV;
 
-  // 3. 应用缩放（现在是沿着选框的长宽方向缩放了）
-  const scaledX = localX * scaleX;
-  const scaledY = localY * scaleY;
+        // 3. 应用缩放（现在是沿着选框的长宽方向缩放了）
+        const scaledX = localX * scaleX;
+        const scaledY = localY * scaleY;
 
-  // 4. 应用变换旋转，并转回世界坐标
-  // 这里的 rotation 初始值包含了 -viewRotation，正好会把上面的第2步抵消掉
-  // 从而让图像在初始状态下保持纹丝不动
-  const rotRad = (rotation * Math.PI) / 180;
-  const cosR = Math.cos(rotRad);
-  const sinR = Math.sin(rotRad);
+        // 4. 应用变换旋转，并转回世界坐标
+        // 这里的 rotation 初始值包含了 -viewRotation，正好会把上面的第2步抵消掉
+        // 从而让图像在初始状态下保持纹丝不动
+        const rotRad = (rotation * Math.PI) / 180;
+        const cosR = Math.cos(rotRad);
+        const sinR = Math.sin(rotRad);
 
-  const finalX = scaledX * cosR - scaledY * sinR;
-  const finalY = scaledX * sinR + scaledY * cosR;
+        const finalX = scaledX * cosR - scaledY * sinR;
+        const finalY = scaledX * sinR + scaledY * cosR;
 
-  // 5. 加上位移和中心点
-  return { x: finalX + cx + x, y: finalY + cy + y };
-}
+        // 5. 加上位移和中心点
+        return { x: finalX + cx + x, y: finalY + cy + y };
+      }
 
       function renderTransformedSelection(ctx) {
         const { originalPaths, bbox, transform } = state.selection;
@@ -4196,14 +4347,17 @@ function transformPoint(p, bbox, transform) {
         ctx.lineJoin = "round";
 
         originalPaths.forEach((originalPath) => {
-          const transformedPoints = originalPath.points.map((p) => transformPoint(p, bbox, transform));
+          const transformedPoints = originalPath.points.map((p) =>
+            transformPoint(p, bbox, transform)
+          );
           if (transformedPoints.length < 1) return;
           ctx.beginPath();
           ctx.moveTo(transformedPoints[0].x, transformedPoints[0].y);
           for (let i = 1; i < transformedPoints.length; i++) {
             ctx.lineTo(transformedPoints[i].x, transformedPoints[i].y);
           }
-          if (layer.mode === "fill" && transformedPoints.length > 1) { // Use layer.mode, not originalPath.mode
+          if (layer.mode === "fill" && transformedPoints.length > 1) {
+            // Use layer.mode, not originalPath.mode
             ctx.closePath();
             ctx.fill();
           } else {
@@ -4214,50 +4368,50 @@ function transformPoint(p, bbox, transform) {
       }
 
       // === 修改 getTransformHandles ===
-// 直接根据宽高和变换参数计算控制点位置，更加稳定
-function getTransformHandles() {
-  const { bbox, transform } = state.selection;
-  if (!bbox) return null;
+      // 直接根据宽高和变换参数计算控制点位置，更加稳定
+      function getTransformHandles() {
+        const { bbox, transform } = state.selection;
+        if (!bbox) return null;
 
-  const halfW = bbox.width / 2;
-  const halfH = bbox.height / 2;
-  const rotationMargin = 40 / state.zoom;
+        const halfW = bbox.width / 2;
+        const halfH = bbox.height / 2;
+        const rotationMargin = 40 / state.zoom;
 
-  // 预计算旋转参数
-  const rotRad = (transform.rotation * Math.PI) / 180;
-  const cos = Math.cos(rotRad);
-  const sin = Math.sin(rotRad);
+        // 预计算旋转参数
+        const rotRad = (transform.rotation * Math.PI) / 180;
+        const cos = Math.cos(rotRad);
+        const sin = Math.sin(rotRad);
 
-  // 辅助函数：将局部坐标(lx, ly)转换到最终世界坐标
-  const toWorld = (lx, ly) => {
-    // 缩放
-    const sx = lx * transform.scaleX;
-    const sy = ly * transform.scaleY;
-    // 旋转 + 平移 + 中心点
-    return {
-      x: bbox.cx + transform.x + (sx * cos - sy * sin),
-      y: bbox.cy + transform.y + (sx * sin + sy * cos)
-    };
-  };
+        // 辅助函数：将局部坐标(lx, ly)转换到最终世界坐标
+        const toWorld = (lx, ly) => {
+          // 缩放
+          const sx = lx * transform.scaleX;
+          const sy = ly * transform.scaleY;
+          // 旋转 + 平移 + 中心点
+          return {
+            x: bbox.cx + transform.x + (sx * cos - sy * sin),
+            y: bbox.cy + transform.y + (sx * sin + sy * cos),
+          };
+        };
 
-  // 1. 计算内部四个角点 (Box Corners)
-  const inner = {
-    tl: toWorld(-halfW, -halfH),
-    tr: toWorld(halfW, -halfH),
-    br: toWorld(halfW, halfH),
-    bl: toWorld(-halfW, halfH)
-  };
+        // 1. 计算内部四个角点 (Box Corners)
+        const inner = {
+          tl: toWorld(-halfW, -halfH),
+          tr: toWorld(halfW, -halfH),
+          br: toWorld(halfW, halfH),
+          bl: toWorld(-halfW, halfH),
+        };
 
-  // 2. 计算外部四个角点 (用于旋转检测区域)
-  const outer = {
-    tl: toWorld(-halfW - rotationMargin, -halfH - rotationMargin),
-    tr: toWorld(halfW + rotationMargin, -halfH - rotationMargin),
-    br: toWorld(halfW + rotationMargin, halfH + rotationMargin),
-    bl: toWorld(-halfW - rotationMargin, halfH + rotationMargin)
-  };
+        // 2. 计算外部四个角点 (用于旋转检测区域)
+        const outer = {
+          tl: toWorld(-halfW - rotationMargin, -halfH - rotationMargin),
+          tr: toWorld(halfW + rotationMargin, -halfH - rotationMargin),
+          br: toWorld(halfW + rotationMargin, halfH + rotationMargin),
+          bl: toWorld(-halfW - rotationMargin, halfH + rotationMargin),
+        };
 
-  return { inner, outer };
-}
+        return { inner, outer };
+      }
       function renderTransformHandles(ctx) {
         const handles = getTransformHandles();
         if (!handles) return;
@@ -4269,7 +4423,7 @@ function getTransformHandles() {
 
         // ▼▼▼ 核心修改：使用 handles.inner 来绘制包围盒和角点 ▼▼▼
         const innerHandles = handles.inner;
-        
+
         ctx.beginPath();
         ctx.moveTo(innerHandles.tl.x, innerHandles.tl.y);
         ctx.lineTo(innerHandles.tr.x, innerHandles.tr.y);
@@ -4281,7 +4435,13 @@ function getTransformHandles() {
         const handleSize = 6 / state.zoom;
         for (const key of ["tl", "tr", "bl", "br"]) {
           ctx.beginPath();
-          ctx.arc(innerHandles[key].x, innerHandles[key].y, handleSize, 0, Math.PI * 2);
+          ctx.arc(
+            innerHandles[key].x,
+            innerHandles[key].y,
+            handleSize,
+            0,
+            Math.PI * 2
+          );
           ctx.fill();
         }
         ctx.restore();
@@ -4294,23 +4454,38 @@ function getTransformHandles() {
         // 1. 优先检查四个角点
         const hitRadius = 12 / state.zoom; // 稍微增大角点的点击范围
         for (const key of ["tl", "tr", "bl", "br"]) {
-          if (Math.hypot(pos.x - handles.inner[key].x, pos.y - handles.inner[key].y) < hitRadius) {
+          if (
+            Math.hypot(
+              pos.x - handles.inner[key].x,
+              pos.y - handles.inner[key].y
+            ) < hitRadius
+          ) {
             return key;
           }
         }
 
         // 2. 检查是否在包围盒内部（移动操作）
-        const innerCorners = [handles.inner.tl, handles.inner.tr, handles.inner.br, handles.inner.bl];
+        const innerCorners = [
+          handles.inner.tl,
+          handles.inner.tr,
+          handles.inner.br,
+          handles.inner.bl,
+        ];
         if (pointInPolygon(pos, innerCorners)) {
           return "move";
         }
-        
+
         // ▼▼▼ 核心修改：检查是否在“外部框”内，但在“内部框”外 ▼▼▼
-        const outerCorners = [handles.outer.tl, handles.outer.tr, handles.outer.br, handles.outer.bl];
+        const outerCorners = [
+          handles.outer.tl,
+          handles.outer.tr,
+          handles.outer.br,
+          handles.outer.bl,
+        ];
         if (pointInPolygon(pos, outerCorners)) {
-            // 如果能执行到这里，说明它不在角点上，也不在内部框里
-            // 那么它一定在内外框之间的“旋转区域”
-            return 'rotate';
+          // 如果能执行到这里，说明它不在角点上，也不在内部框里
+          // 那么它一定在内外框之间的“旋转区域”
+          return "rotate";
         }
 
         return null;
@@ -4320,7 +4495,9 @@ function getTransformHandles() {
         const bubble = DOM.selectionActions;
         if (state.selection.status === "transforming") {
           bubble.style.display = "flex";
-          DOM.selectionUniformBtn.textContent = state.selection.isUniform ? "🔒" : "🔓";
+          DOM.selectionUniformBtn.textContent = state.selection.isUniform
+            ? "🔒"
+            : "🔓";
         } else {
           bubble.style.display = "none";
         }
@@ -4334,4 +4511,3 @@ function getTransformHandles() {
     </script>
   </body>
 </html>
-
