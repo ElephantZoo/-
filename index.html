@@ -2102,70 +2102,81 @@
       }
 
       function renderLayer(ctx, layer, isExporting = false) {
-        ctx.save();
-        ctx.globalAlpha = layer.opacity;
-        ctx.strokeStyle = layer.color;
-        ctx.fillStyle = layer.color;
-        ctx.lineWidth = layer.strokeWidth;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
+    ctx.save();
+    ctx.globalAlpha = layer.opacity;
+    ctx.strokeStyle = layer.color;
+    ctx.fillStyle = layer.color;
+    ctx.lineWidth = layer.strokeWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
-        const drawPaths = (pathsToDraw) => {
-          pathsToDraw.forEach((path) => {
-            // === SELECTION SYSTEM START ===
+    const drawPaths = () => {
+        // 【关键修改1】在循环外部开启路径
+        // 这意味着图层里的所有笔画现在被视为“同一个复杂的形状”
+        ctx.beginPath();
+
+        layer.paths.forEach(path => {
+            // === 选区变换逻辑 (保持不变) ===
             const isSelected = state.selection.selectedPathIds.has(path.id);
-            if (
-              state.selection.status === "transforming" &&
-              isSelected &&
-              !isExporting
-            ) {
-              return;
+            // 如果正在变换中且是选中路径，不渲染原始路径(由renderTransformedSelection负责)
+            // 但如果是导出模式，必须渲染
+            if (state.selection.status === 'transforming' && isSelected && !isExporting) {
+                return;
             }
-            // === SELECTION SYSTEM END ===
+            // ============================
 
-            if (
-              state.isErasing &&
-              state.pathsToErase.has(path.id) &&
-              !isExporting
-            )
-              return;
+            // === 橡皮擦预览逻辑 (保持不变) ===
+            if (state.isErasing && state.pathsToErase.has(path.id) && !isExporting) return;
+            // ============================
+
             if (path.points.length < 1) return;
-            ctx.beginPath();
+
+            // 定义子路径
             ctx.moveTo(path.points[0].x, path.points[0].y);
             if (path.points.length === 1) {
-              ctx.lineTo(path.points[0].x, path.points[0].y);
+                ctx.lineTo(path.points[0].x, path.points[0].y);
             } else {
-              for (let i = 1; i < path.points.length; i++)
-                ctx.lineTo(path.points[i].x, path.points[i].y);
+                for (let i = 1; i < path.points.length; i++) {
+                    ctx.lineTo(path.points[i].x, path.points[i].y);
+                }
             }
-            if (layer.mode === "fill") {
-              if (path.points.length > 1) ctx.closePath();
-              ctx.fill();
-            } else {
-              ctx.stroke();
-            }
-          });
-        };
 
-        if (layer.type === "draft") {
-          const count = state.sliceCount;
-          const step = ((360 / count) * Math.PI) / 180;
-          const cx = CONFIG.baseSize / 2;
-          const cy = CONFIG.baseSize / 2;
-          for (let i = 0; i < count; i++) {
+            // 如果是填充模式，为了防止形状乱飞，每个笔画还是需要闭合的
+            // 但注意：这里不fill，只是闭合路径线
+            if (layer.mode === 'fill' && path.points.length > 1) {
+                ctx.closePath();
+            }
+        });
+
+        // 【关键修改2】在循环结束后，一次性填充或描边
+        // Canvas 会自动计算所有路径的并集（Non-Zero 规则），然后应用一次透明度
+        if (layer.mode === 'fill') {
+            ctx.fill();
+        } else {
+            ctx.stroke();
+        }
+    };
+
+    if (layer.type === 'draft') {
+        const count = state.sliceCount;
+        const step = (360 / count) * Math.PI / 180;
+        const cx = CONFIG.baseSize / 2;
+        const cy = CONFIG.baseSize / 2;
+
+        for (let i = 0; i < count; i++) {
             ctx.save();
             ctx.translate(cx, cy);
             ctx.rotate(i * step);
             ctx.translate(-cx, -cy);
-            drawPaths(layer.paths);
+            drawPaths();
             ctx.restore();
-          }
-        } else {
-          drawPaths(layer.paths);
         }
+    } else {
+        drawPaths();
+    }
 
-        ctx.restore();
-      }
+    ctx.restore();
+}
 
       // === 修复后的 renderOnionSkins 函数 ===
 function renderOnionSkins(ctx) {
