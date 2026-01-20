@@ -2828,6 +2828,10 @@ function renderOnionSkins(ctx) {
               if (pathToErase) state.pathsToErase.add(pathToErase.id);
             } else {
               state.isDrawing = true;
+              const rect = DOM.viewport.getBoundingClientRect();
+  state.cursorScreenX = e.clientX - rect.left;
+  state.cursorScreenY = e.clientY - rect.top;
+
               state.currentBrushPath = [
                 getScreenToWorldPos(e.clientX, e.clientY),
               ];
@@ -3719,32 +3723,59 @@ function renderOnionSkins(ctx) {
         render();
       }
       function loop(time) {
-        if (state.isPlaying) {
-          if (!window._lastTime) window._lastTime = time;
-          const deltaTime = time - window._lastTime;
-          window._lastTime = time;
-          if (state.playbackMode === "slice") {
-            if (!window._sliceTime) window._sliceTime = 0;
-            window._sliceTime += deltaTime;
-            if (window._sliceTime > 1000 / state.fps) {
-              const step = 360 / state.sliceCount;
-              state.animRotation =
-                state.animRotation - step * state.rotDirection;
-              window._sliceTime = 0;
-            }
-          } else {
-            const degreesPerSecond = state.fps * 6;
-            const rotationThisFrame = degreesPerSecond * (deltaTime / 1000);
-            state.animRotation =
-              state.animRotation - rotationThisFrame * state.rotDirection;
-          }
-          render();
-        } else {
-          window._lastTime = 0;
-          window._sliceTime = 0;
-        }
-        requestAnimationFrame(loop);
+  if (state.isPlaying) {
+    if (!window._lastTime) window._lastTime = time;
+    const deltaTime = time - window._lastTime;
+    window._lastTime = time;
+
+    // ---原有旋转逻辑---
+    if (state.playbackMode === "slice") {
+      if (!window._sliceTime) window._sliceTime = 0;
+      window._sliceTime += deltaTime;
+      if (window._sliceTime > 1000 / state.fps) {
+        const step = 360 / state.sliceCount;
+        state.animRotation =
+          state.animRotation - step * state.rotDirection;
+        window._sliceTime = 0;
       }
+    } else {
+      const degreesPerSecond = state.fps * 6;
+      const rotationThisFrame = degreesPerSecond * (deltaTime / 1000);
+      state.animRotation =
+        state.animRotation - rotationThisFrame * state.rotDirection;
+    }
+    // ---原有旋转逻辑结束---
+
+    // ▼▼▼ 新增：在旋转时，如果按住画笔，自动添加路径点 ▼▼▼
+    if (state.isDrawing && state.currentTool === "brush" && state.currentBrushPath.length > 0) {
+      // 1. 获取 Viewport 的位置
+      const rect = DOM.viewport.getBoundingClientRect();
+      
+      // 2. 利用之前记录的 cursorScreenX/Y 和 rect 还原当前绝对坐标
+      //    注意：这里 getScreenToWorldPos 内部会使用最新的 state.animRotation 进行计算
+      const currentWorldPos = getScreenToWorldPos(
+        state.cursorScreenX + rect.left,
+        state.cursorScreenY + rect.top
+      );
+
+      // 3. 为了避免点过于密集（每一帧都加会导致性能问题），计算与上一个点的距离
+      const lastPoint = state.currentBrushPath[state.currentBrushPath.length - 1];
+      const dist = Math.hypot(currentWorldPos.x - lastPoint.x, currentWorldPos.y - lastPoint.y);
+
+      // 4. 只有当距离超过一定阈值（例如 2 像素 / 缩放倍率）时才添加新点
+      if (dist > 2 / state.zoom) {
+        state.currentBrushPath.push(currentWorldPos);
+      }
+    }
+    // ▲▲▲ 新增结束 ▲▲▲
+
+    render();
+  } else {
+    window._lastTime = 0;
+    window._sliceTime = 0;
+  }
+  requestAnimationFrame(loop);
+}
 
       function drawGrid(ctx) {
         const cx = CONFIG.baseSize / 2,
