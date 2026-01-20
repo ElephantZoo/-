@@ -530,7 +530,7 @@
         width: 20px;
         text-align: center;
       }
-      
+
       /* --- 新增样式 START --- */
       .layer-pin {
         cursor: pointer;
@@ -1388,7 +1388,7 @@
           this.id = id;
           this.name = name;
           this.visible = true;
-          this.noRotate = false; // 
+          this.noRotate = false; //
           this.paths = [];
           this.mode = "stroke";
           this.type = type; // normal or draft
@@ -1902,7 +1902,7 @@
           return (
             (Math.atan2(
               clientY - (rect.top + rect.height / 2),
-              clientX - (rect.left + rect.width / 2)
+              clientX - (rect.left + rect.width / 2),
             ) *
               180) /
             Math.PI
@@ -1953,10 +1953,10 @@
             DOM.shortcutPanel.classList.contains("expanded") ? "▲" : "▼";
         };
         DOM.shortcutPanel.addEventListener("pointerdown", (e) =>
-          e.stopPropagation()
+          e.stopPropagation(),
         );
         DOM.shortcutPanel.addEventListener("touchstart", (e) =>
-          e.stopPropagation()
+          e.stopPropagation(),
         );
       }
 
@@ -2001,7 +2001,7 @@
           CONFIG.baseSize / 2,
           radius,
           0,
-          Math.PI * 2
+          Math.PI * 2,
         );
 
         const isTransparent = exporting && DOM.transparentBgToggle.checked;
@@ -2012,7 +2012,7 @@
         ctx.clip();
 
         const activeLayer = getActiveLayer();
-        
+
         // 洋葱皮 (底层)
         if (
           state.onionSkins.enabled &&
@@ -2033,9 +2033,9 @@
             ctx.save();
             // 如果正在播放(或导出)，且图层没有被标记为"不旋转"，则应用旋转
             if ((state.isPlaying || exporting) && !layer.noRotate) {
-                ctx.translate(cx, cy);
-                ctx.rotate(animRad);
-                ctx.translate(-cx, -cy);
+              ctx.translate(cx, cy);
+              ctx.rotate(animRad);
+              ctx.translate(-cx, -cy);
             }
             renderLayer(ctx, layer, exporting);
             ctx.restore();
@@ -2045,26 +2045,30 @@
 
         // === SELECTION SYSTEM START ===
         if (state.selection.status === "transforming" && !exporting) {
-             // 选区变换框应该跟随当前选中图层的旋转状态吗？
-             // 既然处于变换模式，通常动画是暂停的，animRotation=0，所以这里直接画没问题
-            renderTransformedSelection(ctx);
+          // 选区变换框应该跟随当前选中图层的旋转状态吗？
+          // 既然处于变换模式，通常动画是暂停的，animRotation=0，所以这里直接画没问题
+          renderTransformedSelection(ctx);
         }
         // === SELECTION SYSTEM END ===
 
         // 正在绘制的笔刷路径 (跟随当前激活图层的设定)
         if (state.isDrawing && state.currentBrushPath.length > 0) {
-            ctx.save();
-            if ((state.isPlaying || exporting) && activeLayer && !activeLayer.noRotate) {
-                ctx.translate(cx, cy);
-                ctx.rotate(animRad);
-                ctx.translate(-cx, -cy);
-            }
-            renderLayer(
-                ctx,
-                { ...activeLayer, paths: [new Path(state.currentBrushPath)] },
-                exporting
-            );
-            ctx.restore();
+          ctx.save();
+          if (
+            (state.isPlaying || exporting) &&
+            activeLayer &&
+            !activeLayer.noRotate
+          ) {
+            ctx.translate(cx, cy);
+            ctx.rotate(animRad);
+            ctx.translate(-cx, -cy);
+          }
+          renderLayer(
+            ctx,
+            { ...activeLayer, paths: [new Path(state.currentBrushPath)] },
+            exporting,
+          );
+          ctx.restore();
         }
 
         // 洋葱皮 (顶层)
@@ -2076,7 +2080,7 @@
           !exporting
         )
           renderOnionSkins(ctx);
-        
+
         ctx.restore();
 
         // 辅助线/网格 (只在非播放、非导出时显示)
@@ -2137,7 +2141,7 @@
                 state.cursorScreenY,
                 r,
                 0,
-                2 * Math.PI
+                2 * Math.PI,
               );
               ctx.stroke();
             }
@@ -2156,39 +2160,42 @@
           cy = CONFIG.baseSize / 2;
         ctx.translate(cx, cy);
         ctx.rotate(((state.viewRotation - 90) * Math.PI) / 180);
-        
+
         // --- 移除/注释掉这行 ---
         // if (state.isPlaying) ctx.rotate((state.animRotation * Math.PI) / 180);
-        
+
         ctx.translate(-cx, -cy);
       }
 
       // === 终极修复版 renderLayer 函数 ===
-function renderLayer(ctx, layer, isExporting = false) {
-    ctx.save();
-    
-    // 基础样式设置
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = layer.strokeWidth;
-    
-    // 内部绘制函数
-    const drawPaths = () => {
-        // --- 方案 A: 填充模式 (使用离屏缓冲解决破洞+透明度叠加问题) ---
-        if (layer.mode === 'fill') {
+      function renderLayer(ctx, layer, isExporting = false) {
+        ctx.save();
+
+        // 基础样式设置
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.lineWidth = layer.strokeWidth;
+
+        // 内部绘制函数
+        const drawPaths = () => {
+          // --- 方案 A: 填充模式 (使用离屏缓冲解决破洞+透明度叠加问题) ---
+          if (layer.mode === "fill") {
             // 1. 初始化或调整缓冲区大小
             // 我们挂载在 DOM 对象上以便复用，避免每一帧都创建 Canvas 导致卡顿
             if (!DOM.bufferCanvas) {
-                DOM.bufferCanvas = document.createElement('canvas');
-                DOM.bufferCtx = DOM.bufferCanvas.getContext('2d');
+              DOM.bufferCanvas = document.createElement("canvas");
+              DOM.bufferCtx = DOM.bufferCanvas.getContext("2d");
             }
-            if (DOM.bufferCanvas.width !== ctx.canvas.width || DOM.bufferCanvas.height !== ctx.canvas.height) {
-                DOM.bufferCanvas.width = ctx.canvas.width;
-                DOM.bufferCanvas.height = ctx.canvas.height;
+            if (
+              DOM.bufferCanvas.width !== ctx.canvas.width ||
+              DOM.bufferCanvas.height !== ctx.canvas.height
+            ) {
+              DOM.bufferCanvas.width = ctx.canvas.width;
+              DOM.bufferCanvas.height = ctx.canvas.height;
             }
 
             const bCtx = DOM.bufferCtx;
-            
+
             // 2. 清空缓冲区
             bCtx.clearRect(0, 0, bCtx.canvas.width, bCtx.canvas.height);
 
@@ -2201,109 +2208,132 @@ function renderLayer(ctx, layer, isExporting = false) {
             bCtx.fillStyle = layer.color;
             bCtx.globalAlpha = 1; // 强制不透明，解决叠加变深问题
 
-            layer.paths.forEach(path => {
-                // 选区和橡皮擦逻辑
-                const isSelected = state.selection.selectedPathIds.has(path.id);
-                if (state.selection.status === 'transforming' && isSelected && !isExporting) return;
-                if (state.isErasing && state.pathsToErase.has(path.id) && !isExporting) return;
-                if (path.points.length < 1) return;
+            layer.paths.forEach((path) => {
+              // 选区和橡皮擦逻辑
+              const isSelected = state.selection.selectedPathIds.has(path.id);
+              if (
+                state.selection.status === "transforming" &&
+                isSelected &&
+                !isExporting
+              )
+                return;
+              if (
+                state.isErasing &&
+                state.pathsToErase.has(path.id) &&
+                !isExporting
+              )
+                return;
+              if (path.points.length < 1) return;
 
-                // 独立绘制每个形状，解决破洞问题 (Painter's Algorithm)
-                bCtx.beginPath();
-                bCtx.moveTo(path.points[0].x, path.points[0].y);
-                if (path.points.length === 1) {
-                    bCtx.lineTo(path.points[0].x, path.points[0].y);
-                } else {
-                    for (let i = 1; i < path.points.length; i++) {
-                        bCtx.lineTo(path.points[i].x, path.points[i].y);
-                    }
+              // 独立绘制每个形状，解决破洞问题 (Painter's Algorithm)
+              bCtx.beginPath();
+              bCtx.moveTo(path.points[0].x, path.points[0].y);
+              if (path.points.length === 1) {
+                bCtx.lineTo(path.points[0].x, path.points[0].y);
+              } else {
+                for (let i = 1; i < path.points.length; i++) {
+                  bCtx.lineTo(path.points[i].x, path.points[i].y);
                 }
-                bCtx.closePath();
-                bCtx.fill(); 
+              }
+              bCtx.closePath();
+              bCtx.fill();
             });
 
             // 5. 将缓冲区内容绘制回主画布
             // 需要先重置主画布的变换，因为 drawImage 绘制的是整张图，而图里已经包含了变换
             ctx.save();
-            ctx.setTransform(1, 0, 0, 1, 0, 0); 
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.globalAlpha = layer.opacity; // 在这里应用图层透明度
             ctx.drawImage(DOM.bufferCanvas, 0, 0);
             ctx.restore();
-        } 
-        
-        // --- 方案 B: 描边模式 (使用单路径合并解决节点叠加问题) ---
-        else {
+          }
+
+          // --- 方案 B: 描边模式 (使用单路径合并解决节点叠加问题) ---
+          else {
             ctx.strokeStyle = layer.color;
             ctx.globalAlpha = layer.opacity;
             ctx.beginPath(); // 开启一个大路径
 
-            layer.paths.forEach(path => {
-                // 选区和橡皮擦逻辑
-                const isSelected = state.selection.selectedPathIds.has(path.id);
-                if (state.selection.status === 'transforming' && isSelected && !isExporting) return;
-                if (state.isErasing && state.pathsToErase.has(path.id) && !isExporting) return;
-                if (path.points.length < 1) return;
+            layer.paths.forEach((path) => {
+              // 选区和橡皮擦逻辑
+              const isSelected = state.selection.selectedPathIds.has(path.id);
+              if (
+                state.selection.status === "transforming" &&
+                isSelected &&
+                !isExporting
+              )
+                return;
+              if (
+                state.isErasing &&
+                state.pathsToErase.has(path.id) &&
+                !isExporting
+              )
+                return;
+              if (path.points.length < 1) return;
 
-                // 只定义线条，不立即绘制
-                ctx.moveTo(path.points[0].x, path.points[0].y);
-                if (path.points.length === 1) {
-                    ctx.lineTo(path.points[0].x, path.points[0].y);
-                } else {
-                    for (let i = 1; i < path.points.length; i++) {
-                        ctx.lineTo(path.points[i].x, path.points[i].y);
-                    }
+              // 只定义线条，不立即绘制
+              ctx.moveTo(path.points[0].x, path.points[0].y);
+              if (path.points.length === 1) {
+                ctx.lineTo(path.points[0].x, path.points[0].y);
+              } else {
+                for (let i = 1; i < path.points.length; i++) {
+                  ctx.lineTo(path.points[i].x, path.points[i].y);
                 }
+              }
             });
             // 一次性描边，接口处完美融合
             ctx.stroke();
-        }
-    };
+          }
+        };
 
-    // 草稿图层与普通图层的渲染分发逻辑
-    if (layer.type === 'draft') {
-        const count = state.sliceCount;
-        const step = (360 / count) * Math.PI / 180;
-        const cx = CONFIG.baseSize / 2;
-        const cy = CONFIG.baseSize / 2;
+        // 草稿图层与普通图层的渲染分发逻辑
+        if (layer.type === "draft") {
+          const count = state.sliceCount;
+          const step = ((360 / count) * Math.PI) / 180;
+          const cx = CONFIG.baseSize / 2;
+          const cy = CONFIG.baseSize / 2;
 
-        for (let i = 0; i < count; i++) {
+          for (let i = 0; i < count; i++) {
             ctx.save();
             ctx.translate(cx, cy);
             ctx.rotate(i * step);
             ctx.translate(-cx, -cy);
             drawPaths();
             ctx.restore();
+          }
+        } else {
+          drawPaths();
         }
-    } else {
-        drawPaths();
-    }
 
-    ctx.restore();
-}
+        ctx.restore();
+      }
 
       // === 修复后的 renderOnionSkins 函数 ===
       // === 修复洋葱皮破洞问题的 renderOnionSkins 函数 ===
-function renderOnionSkins(ctx) {
-    const activeLayer = getActiveLayer();
-    if (!activeLayer || activeLayer.paths.length === 0) return;
-    if (activeLayer.type === 'draft') return;
+      function renderOnionSkins(ctx) {
+        const activeLayer = getActiveLayer();
+        if (!activeLayer || activeLayer.paths.length === 0) return;
+        if (activeLayer.type === "draft") return;
 
-    // 1. 初始化或调整缓冲区 (复用 renderLayer 创建的 buffer)
-    if (!DOM.bufferCanvas) {
-        DOM.bufferCanvas = document.createElement('canvas');
-        DOM.bufferCtx = DOM.bufferCanvas.getContext('2d');
-    }
-    if (DOM.bufferCanvas.width !== ctx.canvas.width || DOM.bufferCanvas.height !== ctx.canvas.height) {
-        DOM.bufferCanvas.width = ctx.canvas.width;
-        DOM.bufferCanvas.height = ctx.canvas.height;
-    }
-    const bCtx = DOM.bufferCtx;
+        // 1. 初始化或调整缓冲区 (复用 renderLayer 创建的 buffer)
+        if (!DOM.bufferCanvas) {
+          DOM.bufferCanvas = document.createElement("canvas");
+          DOM.bufferCtx = DOM.bufferCanvas.getContext("2d");
+        }
+        if (
+          DOM.bufferCanvas.width !== ctx.canvas.width ||
+          DOM.bufferCanvas.height !== ctx.canvas.height
+        ) {
+          DOM.bufferCanvas.width = ctx.canvas.width;
+          DOM.bufferCanvas.height = ctx.canvas.height;
+        }
+        const bCtx = DOM.bufferCtx;
 
-    const step = 360 / state.sliceCount * Math.PI / 180;
+        const step = ((360 / state.sliceCount) * Math.PI) / 180;
 
-    const drawVectorOnion = (offsetRotation, color) => {
-        // --- 方案 A: 填充模式 (使用离屏缓冲) ---
-        if (activeLayer.mode === 'fill') {
+        const drawVectorOnion = (offsetRotation, color) => {
+          // --- 方案 A: 填充模式 (使用离屏缓冲) ---
+          if (activeLayer.mode === "fill") {
             // A1. 清空缓冲区
             bCtx.clearRect(0, 0, bCtx.canvas.width, bCtx.canvas.height);
 
@@ -2320,50 +2350,54 @@ function renderOnionSkins(ctx) {
 
             // A4. 设置绘制样式 (强制不透明)
             bCtx.fillStyle = color;
-            bCtx.globalAlpha = 1; 
+            bCtx.globalAlpha = 1;
 
             // A5. 逐个绘制路径 (解决破洞)
-            activeLayer.paths.forEach(path => {
-                // 处理选区变换
-                let pointsToDraw = path.points;
-                const isSelectedAndTransforming = 
-                    state.selection.status === 'transforming' && 
-                    state.selection.selectedPathIds.has(path.id);
+            activeLayer.paths.forEach((path) => {
+              // 处理选区变换
+              let pointsToDraw = path.points;
+              const isSelectedAndTransforming =
+                state.selection.status === "transforming" &&
+                state.selection.selectedPathIds.has(path.id);
 
-                if (isSelectedAndTransforming) {
-                    const originalPath = state.selection.originalPaths.get(path.id);
-                    if (originalPath) {
-                        pointsToDraw = originalPath.points.map(p => 
-                            transformPoint(p, state.selection.bbox, state.selection.transform)
-                        );
-                    }
+              if (isSelectedAndTransforming) {
+                const originalPath = state.selection.originalPaths.get(path.id);
+                if (originalPath) {
+                  pointsToDraw = originalPath.points.map((p) =>
+                    transformPoint(
+                      p,
+                      state.selection.bbox,
+                      state.selection.transform,
+                    ),
+                  );
                 }
+              }
 
-                if (pointsToDraw.length < 1) return;
+              if (pointsToDraw.length < 1) return;
 
-                bCtx.beginPath();
-                bCtx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
-                for (let i = 1; i < pointsToDraw.length; i++) {
-                    bCtx.lineTo(pointsToDraw[i].x, pointsToDraw[i].y);
-                }
-                bCtx.closePath();
-                bCtx.fill();
+              bCtx.beginPath();
+              bCtx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
+              for (let i = 1; i < pointsToDraw.length; i++) {
+                bCtx.lineTo(pointsToDraw[i].x, pointsToDraw[i].y);
+              }
+              bCtx.closePath();
+              bCtx.fill();
             });
             bCtx.restore(); // 恢复 buffer 的变换状态
 
             // A6. 将缓冲区绘制回主画布
             ctx.save();
             // 重置主画布变换，因为 buffer 已经是全屏图像了
-            ctx.setTransform(1, 0, 0, 1, 0, 0); 
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.globalAlpha = state.onionSkins.opacity; // 应用洋葱皮透明度
             ctx.drawImage(DOM.bufferCanvas, 0, 0);
             ctx.restore();
-        } 
-        // --- 方案 B: 描边模式 (使用合并路径) ---
-        else {
+          }
+          // --- 方案 B: 描边模式 (使用合并路径) ---
+          else {
             ctx.save();
             ctx.globalAlpha = state.onionSkins.opacity;
-            
+
             // 应用洋葱皮旋转
             ctx.translate(CONFIG.baseSize / 2, CONFIG.baseSize / 2);
             ctx.rotate(offsetRotation);
@@ -2371,41 +2405,47 @@ function renderOnionSkins(ctx) {
 
             ctx.strokeStyle = color;
             ctx.lineWidth = activeLayer.strokeWidth;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
 
             // 开启大路径，一次性描边 (解决叠加变深，且无破洞问题)
             ctx.beginPath();
-            activeLayer.paths.forEach(path => {
-                // 处理选区变换
-                let pointsToDraw = path.points;
-                const isSelectedAndTransforming = 
-                    state.selection.status === 'transforming' && 
-                    state.selection.selectedPathIds.has(path.id);
+            activeLayer.paths.forEach((path) => {
+              // 处理选区变换
+              let pointsToDraw = path.points;
+              const isSelectedAndTransforming =
+                state.selection.status === "transforming" &&
+                state.selection.selectedPathIds.has(path.id);
 
-                if (isSelectedAndTransforming) {
-                    const originalPath = state.selection.originalPaths.get(path.id);
-                    if (originalPath) {
-                        pointsToDraw = originalPath.points.map(p => 
-                            transformPoint(p, state.selection.bbox, state.selection.transform)
-                        );
-                    }
+              if (isSelectedAndTransforming) {
+                const originalPath = state.selection.originalPaths.get(path.id);
+                if (originalPath) {
+                  pointsToDraw = originalPath.points.map((p) =>
+                    transformPoint(
+                      p,
+                      state.selection.bbox,
+                      state.selection.transform,
+                    ),
+                  );
                 }
+              }
 
-                if (pointsToDraw.length < 1) return;
-                ctx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
-                for (let i = 1; i < pointsToDraw.length; i++) {
-                    ctx.lineTo(pointsToDraw[i].x, pointsToDraw[i].y);
-                }
+              if (pointsToDraw.length < 1) return;
+              ctx.moveTo(pointsToDraw[0].x, pointsToDraw[0].y);
+              for (let i = 1; i < pointsToDraw.length; i++) {
+                ctx.lineTo(pointsToDraw[i].x, pointsToDraw[i].y);
+              }
             });
             ctx.stroke();
             ctx.restore();
-        }
-    };
+          }
+        };
 
-    if (state.onionSkins.showBefore) drawVectorOnion(-step * state.rotDirection, '#ff0000');
-    if (state.onionSkins.showAfter) drawVectorOnion(step * state.rotDirection, '#0000ff');
-}
+        if (state.onionSkins.showBefore)
+          drawVectorOnion(-step * state.rotDirection, "#ff0000");
+        if (state.onionSkins.showAfter)
+          drawVectorOnion(step * state.rotDirection, "#0000ff");
+      }
 
       function updateUI() {
         DOM.projectNameInput.value = state.projectName;
@@ -2424,19 +2464,19 @@ function renderOnionSkins(ctx) {
           DOM.layerColorSwatch.style.backgroundColor = activeLayer.color;
           DOM.modeFillBtn.classList.toggle(
             "active",
-            state.currentTool === "brush" && activeLayer.mode === "fill"
+            state.currentTool === "brush" && activeLayer.mode === "fill",
           );
           DOM.modeStrokeBtn.classList.toggle(
             "active",
-            state.currentTool === "brush" && activeLayer.mode === "stroke"
+            state.currentTool === "brush" && activeLayer.mode === "stroke",
           );
           DOM.toolEraserBtn.classList.toggle(
             "active",
-            state.currentTool === "eraser"
+            state.currentTool === "eraser",
           );
           DOM.toolSelectBtn.classList.toggle(
             "active",
-            state.currentTool === "select"
+            state.currentTool === "select",
           );
           DOM.brushSize.value = activeLayer.strokeWidth;
           DOM.brushSizeVal.textContent = activeLayer.strokeWidth;
@@ -2461,13 +2501,13 @@ function renderOnionSkins(ctx) {
           .querySelector('label[for="onionBeforeToggle"]')
           .classList.toggle(
             "active",
-            state.onionSkins.showBefore && state.onionSkins.enabled
+            state.onionSkins.showBefore && state.onionSkins.enabled,
           );
         document
           .querySelector('label[for="onionAfterToggle"]')
           .classList.toggle(
             "active",
-            state.onionSkins.showAfter && state.onionSkins.enabled
+            state.onionSkins.showAfter && state.onionSkins.enabled,
           );
         DOM.onionOpacityVal.textContent = state.onionSkins.opacity.toFixed(2);
         DOM.onionOpacity.value = state.onionSkins.opacity;
@@ -2512,7 +2552,7 @@ function renderOnionSkins(ctx) {
           // --- 2. 新增：不旋转(图钉)按钮 START ---
           const pin = document.createElement("span");
           pin.className = `layer-pin ${layer.noRotate ? "active" : ""}`;
-          pin.innerHTML = "📌"; 
+          pin.innerHTML = "📌";
           pin.title = layer.noRotate ? "该图层不跟随旋转" : "该图层跟随旋转";
           pin.onclick = (e) => {
             e.stopPropagation();
@@ -2524,21 +2564,27 @@ function renderOnionSkins(ctx) {
           nameBox.className = "layer-name";
           nameBox.innerText =
             layer.name + (layer.type === "draft" ? " (草稿)" : "");
-          
+
           const colorIndicator = document.createElement("div");
           colorIndicator.style.cssText = `width:12px; height:12px; background-color:${layer.color}; border-radius:3px; border:1px solid #222; flex-shrink:0; opacity:${layer.opacity};`;
-          
+
           // ... 移动按钮逻辑 ...
           const upBtn = document.createElement("button");
           // ... (原代码不变)
           upBtn.className = "layer-move-btn";
           upBtn.innerHTML = "↑";
-          upBtn.onclick = (e) => { e.stopPropagation(); moveLayer(i, 1); };
+          upBtn.onclick = (e) => {
+            e.stopPropagation();
+            moveLayer(i, 1);
+          };
 
           const downBtn = document.createElement("button");
           downBtn.className = "layer-move-btn";
           downBtn.innerHTML = "↓";
-          downBtn.onclick = (e) => { e.stopPropagation(); moveLayer(i, -1); };
+          downBtn.onclick = (e) => {
+            e.stopPropagation();
+            moveLayer(i, -1);
+          };
 
           // 注意：这里把 pin 加进去了
           div.append(vis, pin, colorIndicator, nameBox, upBtn, downBtn);
@@ -2548,10 +2594,12 @@ function renderOnionSkins(ctx) {
           // ... 拖拽事件 ...
           div.addEventListener("dragstart", handleDragStart);
           div.addEventListener("dragover", handleDragOver);
-          div.addEventListener("dragleave", (e) => e.currentTarget.classList.remove("drag-over"));
+          div.addEventListener("dragleave", (e) =>
+            e.currentTarget.classList.remove("drag-over"),
+          );
           div.addEventListener("drop", handleDrop);
           div.addEventListener("dragend", handleDragEnd);
-          
+
           DOM.layerList.prepend(div);
         });
       }
@@ -2566,7 +2614,6 @@ function renderOnionSkins(ctx) {
         }
       }
 
-
       function getActiveLayer() {
         return state.activeLayerIndex > -1
           ? state.layers[state.activeLayerIndex]
@@ -2580,7 +2627,7 @@ function renderOnionSkins(ctx) {
               ? `草稿 ${state.layers.length + 1}`
               : `图层 ${state.layers.length + 1}`),
           color,
-          type
+          type,
         );
         state.layers.push(newLayer);
         setActiveLayer(state.layers.length - 1);
@@ -2656,7 +2703,7 @@ function renderOnionSkins(ctx) {
         for (let i = 1; i < points.length - 1; i++) {
           const dist = Math.hypot(
             points[i].x - lastPoint.x,
-            points[i].y - lastPoint.y
+            points[i].y - lastPoint.y,
           );
           if (dist > threshold) {
             newPoints.push(points[i]);
@@ -2772,7 +2819,7 @@ function renderOnionSkins(ctx) {
         const activeId = getActiveLayer()?.id;
         const droppedOnId = parseFloat(target.dataset.layerId);
         const draggedIndex = state.layers.findIndex(
-          (l) => l.id === state.draggedLayerId
+          (l) => l.id === state.draggedLayerId,
         );
         const targetIndex = state.layers.findIndex((l) => l.id === droppedOnId);
         if (draggedIndex === -1 || targetIndex === -1) return;
@@ -2896,6 +2943,11 @@ function renderOnionSkins(ctx) {
           if (state.isGesturing) return;
           if (e.pointerType === "touch" && !e.isPrimary) return;
 
+          // === 1. 获取当前图层是否不旋转 ===
+          const activeLayer = getActiveLayer();
+          const ignoreAnim = activeLayer ? activeLayer.noRotate : false;
+          // ==============================
+
           // === SELECTION SYSTEM START ===
           if (state.currentTool === "select") {
             handleSelectionPointerDown(e);
@@ -2910,17 +2962,19 @@ function renderOnionSkins(ctx) {
             state.isCursorInCanvas = true;
             if (state.currentTool === "eraser") {
               state.isErasing = true;
-              const pos = getScreenToWorldPos(e.clientX, e.clientY);
+              // 传入 ignoreAnim
+              const pos = getScreenToWorldPos(e.clientX, e.clientY, ignoreAnim);
               const pathToErase = findClosestPath(pos);
               if (pathToErase) state.pathsToErase.add(pathToErase.id);
             } else {
               state.isDrawing = true;
               const rect = DOM.viewport.getBoundingClientRect();
-  state.cursorScreenX = e.clientX - rect.left;
-  state.cursorScreenY = e.clientY - rect.top;
+              state.cursorScreenX = e.clientX - rect.left;
+              state.cursorScreenY = e.clientY - rect.top;
 
               state.currentBrushPath = [
-                getScreenToWorldPos(e.clientX, e.clientY),
+                // 传入 ignoreAnim
+                getScreenToWorldPos(e.clientX, e.clientY, ignoreAnim),
               ];
             }
             return;
@@ -2937,7 +2991,10 @@ function renderOnionSkins(ctx) {
             state.dragStartViewRot = state.viewRotation;
             return;
           }
-          const pos = getScreenToWorldPos(e.clientX, e.clientY);
+          
+          // 传入 ignoreAnim
+          const pos = getScreenToWorldPos(e.clientX, e.clientY, ignoreAnim);
+          
           if (state.currentTool === "eraser") {
             state.isErasing = true;
             const pathToErase = findClosestPath(pos);
@@ -2959,7 +3016,14 @@ function renderOnionSkins(ctx) {
             e.clientX - DOM.viewport.getBoundingClientRect().left;
           state.cursorScreenY =
             e.clientY - DOM.viewport.getBoundingClientRect().top;
-          const worldPos = getScreenToWorldPos(e.clientX, e.clientY);
+          
+          // === 1. 获取当前图层是否不旋转 ===
+          const activeLayer = getActiveLayer();
+          const ignoreAnim = activeLayer ? activeLayer.noRotate : false;
+          // 传入 ignoreAnim
+          const worldPos = getScreenToWorldPos(e.clientX, e.clientY, ignoreAnim);
+          // ==============================
+          
           state.cursorWorldX = worldPos.x;
           state.cursorWorldY = worldPos.y;
 
@@ -2987,15 +3051,17 @@ function renderOnionSkins(ctx) {
           if (state.isDrawing) {
             const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
             events.forEach((ev) => {
+              // 传入 ignoreAnim
               state.currentBrushPath.push(
-                getScreenToWorldPos(ev.clientX, ev.clientY)
+                getScreenToWorldPos(ev.clientX, ev.clientY, ignoreAnim)
               );
             });
           }
           if (state.isErasing) {
             const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
             events.forEach((ev) => {
-              const coPos = getScreenToWorldPos(ev.clientX, ev.clientY);
+              // 传入 ignoreAnim
+              const coPos = getScreenToWorldPos(ev.clientX, ev.clientY, ignoreAnim);
               const pathToErase = findClosestPath(coPos);
               if (pathToErase) state.pathsToErase.add(pathToErase.id);
             });
@@ -3776,7 +3842,8 @@ function renderOnionSkins(ctx) {
         }
       }
 
-      function getScreenToWorldPos(screenX, screenY) {
+      // === 修改后的坐标转换函数 ===
+      function getScreenToWorldPos(screenX, screenY, ignoreAnim = false) {
         const rect = DOM.viewport.getBoundingClientRect();
         const viewX = screenX - rect.left;
         const viewY = screenY - rect.top;
@@ -3786,7 +3853,11 @@ function renderOnionSkins(ctx) {
           cy = CONFIG.baseSize / 2;
         const dx = worldX - cx,
           dy = worldY - cy;
-        const dynamicRotation = state.isPlaying ? state.animRotation : 0;
+
+        // 关键修改：如果 ignoreAnim 为 true，则强制 dynamicRotation 为 0
+        const dynamicRotation =
+          state.isPlaying && !ignoreAnim ? state.animRotation : 0;
+
         const rad =
           (-(state.viewRotation - 90 + dynamicRotation) * Math.PI) / 180;
         const finalX = dx * Math.cos(rad) - dy * Math.sin(rad) + cx;
@@ -3810,59 +3881,71 @@ function renderOnionSkins(ctx) {
         render();
       }
       function loop(time) {
-  if (state.isPlaying) {
-    if (!window._lastTime) window._lastTime = time;
-    const deltaTime = time - window._lastTime;
-    window._lastTime = time;
+        if (state.isPlaying) {
+          if (!window._lastTime) window._lastTime = time;
+          const deltaTime = time - window._lastTime;
+          window._lastTime = time;
 
-    // ---原有旋转逻辑---
-    if (state.playbackMode === "slice") {
-      if (!window._sliceTime) window._sliceTime = 0;
-      window._sliceTime += deltaTime;
-      if (window._sliceTime > 1000 / state.fps) {
-        const step = 360 / state.sliceCount;
-        state.animRotation =
-          state.animRotation - step * state.rotDirection;
-        window._sliceTime = 0;
+          // ---原有旋转逻辑---
+          if (state.playbackMode === "slice") {
+            if (!window._sliceTime) window._sliceTime = 0;
+            window._sliceTime += deltaTime;
+            if (window._sliceTime > 1000 / state.fps) {
+              const step = 360 / state.sliceCount;
+              state.animRotation =
+                state.animRotation - step * state.rotDirection;
+              window._sliceTime = 0;
+            }
+          } else {
+            const degreesPerSecond = state.fps * 6;
+            const rotationThisFrame = degreesPerSecond * (deltaTime / 1000);
+            state.animRotation =
+              state.animRotation - rotationThisFrame * state.rotDirection;
+          }
+          // ---原有旋转逻辑结束---
+
+          // ▼▼▼ 修复：只保留这一份补帧逻辑，并正确处理 ignoreAnim ▼▼▼
+          if (
+            state.isDrawing &&
+            state.currentTool === "brush" &&
+            state.currentBrushPath.length > 0
+          ) {
+            const rect = DOM.viewport.getBoundingClientRect();
+
+            // 1. 获取当前激活图层是否为“不旋转”
+            const activeLayer = getActiveLayer();
+            const ignoreAnim = activeLayer ? activeLayer.noRotate : false;
+
+            // 2. 传入 ignoreAnim 参数，确保坐标计算正确
+            //    如果 ignoreAnim 为 true，getScreenToWorldPos 会忽略当前的 animRotation
+            const currentWorldPos = getScreenToWorldPos(
+              state.cursorScreenX + rect.left,
+              state.cursorScreenY + rect.top,
+              ignoreAnim 
+            );
+
+            // 3. 计算距离，避免点过密
+            const lastPoint =
+              state.currentBrushPath[state.currentBrushPath.length - 1];
+            const dist = Math.hypot(
+              currentWorldPos.x - lastPoint.x,
+              currentWorldPos.y - lastPoint.y,
+            );
+
+            // 4. 添加点
+            if (dist > 2 / state.zoom) {
+              state.currentBrushPath.push(currentWorldPos);
+            }
+          }
+          // ▲▲▲ 修复结束 ▲▲▲
+
+          render();
+        } else {
+          window._lastTime = 0;
+          window._sliceTime = 0;
+        }
+        requestAnimationFrame(loop);
       }
-    } else {
-      const degreesPerSecond = state.fps * 6;
-      const rotationThisFrame = degreesPerSecond * (deltaTime / 1000);
-      state.animRotation =
-        state.animRotation - rotationThisFrame * state.rotDirection;
-    }
-    // ---原有旋转逻辑结束---
-
-    // ▼▼▼ 新增：在旋转时，如果按住画笔，自动添加路径点 ▼▼▼
-    if (state.isDrawing && state.currentTool === "brush" && state.currentBrushPath.length > 0) {
-      // 1. 获取 Viewport 的位置
-      const rect = DOM.viewport.getBoundingClientRect();
-      
-      // 2. 利用之前记录的 cursorScreenX/Y 和 rect 还原当前绝对坐标
-      //    注意：这里 getScreenToWorldPos 内部会使用最新的 state.animRotation 进行计算
-      const currentWorldPos = getScreenToWorldPos(
-        state.cursorScreenX + rect.left,
-        state.cursorScreenY + rect.top
-      );
-
-      // 3. 为了避免点过于密集（每一帧都加会导致性能问题），计算与上一个点的距离
-      const lastPoint = state.currentBrushPath[state.currentBrushPath.length - 1];
-      const dist = Math.hypot(currentWorldPos.x - lastPoint.x, currentWorldPos.y - lastPoint.y);
-
-      // 4. 只有当距离超过一定阈值（例如 2 像素 / 缩放倍率）时才添加新点
-      if (dist > 2 / state.zoom) {
-        state.currentBrushPath.push(currentWorldPos);
-      }
-    }
-    // ▲▲▲ 新增结束 ▲▲▲
-
-    render();
-  } else {
-    window._lastTime = 0;
-    window._sliceTime = 0;
-  }
-  requestAnimationFrame(loop);
-}
 
       function drawGrid(ctx) {
         const cx = CONFIG.baseSize / 2,
@@ -4042,7 +4125,7 @@ function renderOnionSkins(ctx) {
           if (path) {
             state.selection.originalPaths.set(
               id,
-              JSON.parse(JSON.stringify(path))
+              JSON.parse(JSON.stringify(path)),
             );
           }
         });
@@ -4076,7 +4159,7 @@ function renderOnionSkins(ctx) {
           const originalPath = originalPaths.get(id);
           if (pathInLayer && originalPath) {
             pathInLayer.points = originalPath.points.map((p) =>
-              transformPoint(p, bbox, transform)
+              transformPoint(p, bbox, transform),
             );
           }
         });
@@ -4089,7 +4172,7 @@ function renderOnionSkins(ctx) {
           if (path) {
             state.selection.originalPaths.set(
               id,
-              JSON.parse(JSON.stringify(path))
+              JSON.parse(JSON.stringify(path)),
             );
           }
         });
@@ -4119,7 +4202,7 @@ function renderOnionSkins(ctx) {
             if (pathInLayer && originalPath) {
               // 应用最终的变换并更新图层数据
               pathInLayer.points = originalPath.points.map((p) =>
-                transformPoint(p, bbox, transform)
+                transformPoint(p, bbox, transform),
               );
             }
           });
@@ -4248,11 +4331,11 @@ function renderOnionSkins(ctx) {
               };
               const startAngle = Math.atan2(
                 s.dragStart.y - pivot.cy,
-                s.dragStart.x - pivot.cx
+                s.dragStart.x - pivot.cx,
               );
               const currentAngle = Math.atan2(
                 worldPos.y - pivot.cy,
-                worldPos.x - pivot.cx
+                worldPos.x - pivot.cx,
               );
               s.transform.rotation =
                 startTransform.rotation +
@@ -4401,12 +4484,12 @@ function renderOnionSkins(ctx) {
         ctx.beginPath();
         ctx.moveTo(
           state.selection.lassoPath[0].x,
-          state.selection.lassoPath[0].y
+          state.selection.lassoPath[0].y,
         );
         for (let i = 1; i < state.selection.lassoPath.length; i++) {
           ctx.lineTo(
             state.selection.lassoPath[i].x,
-            state.selection.lassoPath[i].y
+            state.selection.lassoPath[i].y,
           );
         }
         ctx.stroke();
@@ -4466,7 +4549,7 @@ function renderOnionSkins(ctx) {
 
         originalPaths.forEach((originalPath) => {
           const transformedPoints = originalPath.points.map((p) =>
-            transformPoint(p, bbox, transform)
+            transformPoint(p, bbox, transform),
           );
           if (transformedPoints.length < 1) return;
           ctx.beginPath();
@@ -4558,7 +4641,7 @@ function renderOnionSkins(ctx) {
             innerHandles[key].y,
             handleSize,
             0,
-            Math.PI * 2
+            Math.PI * 2,
           );
           ctx.fill();
         }
@@ -4575,7 +4658,7 @@ function renderOnionSkins(ctx) {
           if (
             Math.hypot(
               pos.x - handles.inner[key].x,
-              pos.y - handles.inner[key].y
+              pos.y - handles.inner[key].y,
             ) < hitRadius
           ) {
             return key;
